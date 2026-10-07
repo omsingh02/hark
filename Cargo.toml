@@ -32,7 +32,7 @@ hark-core = { path = "crates/hark-core" }
 
 # Audio capture and lock-free buffers
 cpal = "0.15"
-rtrb = "0.3"
+rtrb = "0.4"
 
 # Binary Serialization & Checksums
 byteorder = "1.5"
