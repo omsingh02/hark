@@ -1,3 +1,3 @@
 pub mod storage;
 
-pub use storage::HistoryStorage;
+pub use storage::{extract_base_title, extract_lead_artist, HistoryStorage};
