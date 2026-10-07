@@ -21,6 +21,12 @@ pub struct RingBuffer {
     count: usize,
 }
 
+impl Default for RingBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RingBuffer {
     pub fn new() -> Self {
         Self {

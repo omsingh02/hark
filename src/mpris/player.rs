@@ -61,6 +61,8 @@ pub struct HarkPlayer {
 }
 
 impl HarkPlayer {
+    // The player shares state with the recognition loop in main, so every handle is passed in.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         is_listening: Arc<AtomicBool>,
         engine_status: Arc<RwLock<String>>,

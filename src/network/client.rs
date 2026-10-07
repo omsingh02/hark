@@ -171,6 +171,12 @@ pub struct ShazamClient {
     client: Client,
 }
 
+impl Default for ShazamClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ShazamClient {
     pub fn new() -> Self {
         let client = Client::builder()

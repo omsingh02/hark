@@ -9,6 +9,12 @@ pub struct HistoryStorage {
     jsonl_path: PathBuf,
 }
 
+impl Default for HistoryStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HistoryStorage {
     pub fn new() -> Self {
         Self::open(&dirs_or_fallback())
@@ -96,10 +102,14 @@ impl HistoryStorage {
             let stored_lead = extract_lead_artist(stored_artist);
             let song_lead = extract_lead_artist(&song.artist);
 
-            if !stored_base.is_empty() && !song_base.is_empty() && stored_base == song_base {
-                if !stored_lead.is_empty() && !song_lead.is_empty() && stored_lead == song_lead {
-                    return true;
-                }
+            if !stored_base.is_empty()
+                && !song_base.is_empty()
+                && stored_base == song_base
+                && !stored_lead.is_empty()
+                && !song_lead.is_empty()
+                && stored_lead == song_lead
+            {
+                return true;
             }
         }
 
@@ -145,10 +155,14 @@ impl HistoryStorage {
             let a_lead = extract_lead_artist(a_artist);
             let b_lead = extract_lead_artist(b_artist);
 
-            if !a_base.is_empty() && !b_base.is_empty() && a_base == b_base {
-                if !a_lead.is_empty() && !b_lead.is_empty() && a_lead == b_lead {
-                    return true;
-                }
+            if !a_base.is_empty()
+                && !b_base.is_empty()
+                && a_base == b_base
+                && !a_lead.is_empty()
+                && !b_lead.is_empty()
+                && a_lead == b_lead
+            {
+                return true;
             }
         }
 
@@ -201,7 +215,7 @@ impl HistoryStorage {
         let reader = BufReader::new(file);
         reader
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(Result::ok)
             .filter(|l| !l.trim().is_empty())
             .filter_map(|l| serde_json::from_str::<serde_json::Value>(&l).ok())
             .collect()
@@ -350,8 +364,8 @@ pub fn extract_base_title(title: &str) -> String {
     let mut s = title.to_lowercase();
 
     // 1. Remove bracketed/parenthetical content: (...), [...], {...}
-    while let Some(start) = s.find(|c| c == '(' || c == '[' || c == '{') {
-        if let Some(end) = s[start..].find(|c| c == ')' || c == ']' || c == '}') {
+    while let Some(start) = s.find(['(', '[', '{']) {
+        if let Some(end) = s[start..].find([')', ']', '}']) {
             s.replace_range(start..=start + end, " ");
         } else {
             s.truncate(start);
