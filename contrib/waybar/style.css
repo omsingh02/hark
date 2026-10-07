@@ -1,0 +1,46 @@
+/* Styles for the hark Waybar module.
+ *
+ * The daemon sets one of these classes on the module:
+ *   paused       listening is switched off
+ *   ambient      listening, nothing recognised yet
+ *   found        a song was recognised
+ *   offline      the recognition service is unreachable
+ *   ratelimited  the service asked hark to slow down
+ *
+ * Adjust the colours to match your theme.
+ */
+
+@define-color hark_idle #8b93a7;
+@define-color hark_listening #5b7cfa;
+@define-color hark_found #18b5a5;
+@define-color hark_offline #e06c75;
+@define-color hark_ratelimited #e5a14f;
+
+#custom-hark {
+    padding: 0 10px;
+    color: @hark_idle;
+}
+
+#custom-hark.paused {
+    color: @hark_idle;
+}
+
+#custom-hark.ambient {
+    color: @hark_listening;
+}
+
+#custom-hark.found {
+    color: @hark_found;
+}
+
+#custom-hark.offline {
+    color: @hark_offline;
+}
+
+#custom-hark.ratelimited {
+    color: @hark_ratelimited;
+}
+
+#custom-hark:hover {
+    background: alpha(@hark_listening, 0.15);
+}

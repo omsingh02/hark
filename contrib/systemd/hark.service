@@ -1,0 +1,38 @@
+# hark - systemd user unit
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp contrib/systemd/hark.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now hark
+#
+# ExecStart assumes the binary was installed with `cargo install`, which puts it
+# in ~/.cargo/bin. If hark lives somewhere else, override it with:
+#   systemctl --user edit hark
+# and set
+#   [Service]
+#   ExecStart=
+#   ExecStart=/path/to/hark
+#
+# Logs: journalctl --user -u hark -f
+#
+# Only NoNewPrivileges is set. Filesystem sandboxing such as ProtectHome or
+# ProtectSystem is left out on purpose: the daemon needs the sound server and
+# session bus sockets plus a few directories under XDG_RUNTIME_DIR,
+# ~/.local/share and ~/.cache, and that has not been verified against every
+# sound server setup.
+
+[Unit]
+Description=hark - always-on song recognition
+Documentation=https://github.com/omsingh02/hark
+After=pipewire.service wireplumber.service pipewire-pulse.service
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/hark
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

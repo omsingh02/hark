@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# hark-waybar - Waybar helper for the hark daemon.
+#
+#   hark-waybar          print the current state as Waybar JSON
+#   hark-waybar toggle   pause or resume listening
+#
+# Set HARK_BIN if the hark binary is not on the PATH that Waybar runs with.
+set -u
+
+hark="${HARK_BIN:-hark}"
+state="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hark/waybar.json"
+
+# Start the service if it is enabled but not running.
+if ! pgrep -x hark >/dev/null 2>&1 && systemctl --user is-enabled --quiet hark 2>/dev/null; then
+    systemctl --user start hark 2>/dev/null
+    sleep 0.2
+fi
+
+if [ "${1:-}" = "toggle" ]; then
+    "$hark" --toggle >/dev/null 2>&1
+    pkill -RTMIN+10 waybar 2>/dev/null
+    exit 0
+fi
+
+if [ -s "$state" ]; then
+    cat "$state"
+else
+    # The text is the "paused" icon (a Nerd Font glyph) written as a JSON escape.
+    printf '%s\n' '{"text":"\udb80\udfe4","tooltip":"hark is not running","class":"paused"}'
+fi

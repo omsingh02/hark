@@ -1,0 +1,20 @@
+// Waybar module for hark.
+//
+// 1. Install the helper:  install -Dm755 contrib/waybar/hark-waybar ~/.local/bin/hark-waybar
+// 2. Add "custom/hark" to modules-left, modules-center or modules-right.
+// 3. Merge the block below into your Waybar config.
+// 4. Copy the rules from style.css into your Waybar stylesheet.
+//
+// The icons are Nerd Font glyphs, so the bar needs a Nerd Font in its font stack.
+// If Waybar cannot find the hark binary, start it with HARK_BIN set to the full path.
+{
+    "custom/hark": {
+        "exec": "~/.local/bin/hark-waybar",
+        "return-type": "json",
+        "interval": 5,
+        "signal": 10,
+        "on-click": "~/.local/bin/hark-waybar toggle",
+        "on-click-right": "foot --title 'hark history' sh -c 'less +G \"$HOME/.local/share/hark/history.txt\"'",
+        "tooltip": true
+    }
+}
