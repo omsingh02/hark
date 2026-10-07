@@ -25,7 +25,7 @@ impl HistoryStorage {
     /// On the very first run, a history written by shazam-daemon (`<data_dir>/shazam_history.*`)
     /// is copied in; the original files are left untouched. Later runs never import again, so
     /// clearing the history stays cleared.
-    fn open(data_dir: &Path) -> Self {
+    pub fn open(data_dir: &Path) -> Self {
         let dir = data_dir.join("hark");
         let first_run = !dir.exists();
         let _ = create_dir_all(&dir);

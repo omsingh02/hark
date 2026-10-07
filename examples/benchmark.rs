@@ -213,7 +213,9 @@ fn main() {
     // 5. History Storage Engine (JSONL Persistence & Search)
     // ------------------------------------------------------------
     println!("--- 5. History Storage Engine (JSONL Persistence) ---");
-    let storage = HistoryStorage::new();
+    // Use a throwaway directory so the benchmark never touches your real history.
+    let data_dir = std::env::temp_dir().join(format!("hark_bench_{}", std::process::id()));
+    let storage = HistoryStorage::open(&data_dir);
     let test_song = RecognizedSong {
         shazam_key: Some("12345678".into()),
         title: "Benchmark Track".into(),
@@ -257,6 +259,7 @@ fn main() {
         format_duration(avg_r),
         format_duration(p95_r)
     );
+    let _ = std::fs::remove_dir_all(&data_dir);
 
     println!("============================================================");
     println!("                  BENCHMARK RUN COMPLETED                   ");
