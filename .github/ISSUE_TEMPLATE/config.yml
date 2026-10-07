@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting
+    url: https://github.com/omsingh02/hark#troubleshooting
+    about: Common problems with audio capture, the MPRIS player and status bars are covered in the README.
+  - name: Report a security vulnerability
+    url: https://github.com/omsingh02/hark/security/advisories/new
+    about: Please report security problems privately instead of opening a public issue.
