@@ -134,6 +134,7 @@ pub struct ShazamClient {
 impl ShazamClient {
     pub fn new() -> Self {
         let client = Client::builder()
+            .http1_only()
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_else(|_| Client::new());
@@ -185,6 +186,10 @@ impl ShazamClient {
             .json(&payload)
             .send()
             .await?;
+
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Err("Shazam API Rate Limited (HTTP 429: Too Many Requests)".into());
+        }
 
         if !response.status().is_success() {
             return Ok(None);
