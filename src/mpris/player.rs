@@ -1,12 +1,13 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use zbus::interface;
 use zbus::zvariant::Value;
 
-use crate::downloader::JioSaavnDownloader;
+use crate::cache::CoverCacheManager;
+use crate::downloader::JioSaavnClient;
+use crate::history::HistoryStorage;
 use crate::network::models::RecognizedSong;
 
 pub struct ShazamRoot;
@@ -51,7 +52,12 @@ pub struct ShazamPlayer {
     is_listening: Arc<AtomicBool>,
     engine_status: Arc<RwLock<String>>,
     current_song: Arc<RwLock<Option<RecognizedSong>>>,
-    downloader: Arc<JioSaavnDownloader>,
+    downloader: Arc<JioSaavnClient>,
+    is_foreground: Arc<AtomicBool>,
+    foreground_notify: Arc<tokio::sync::Notify>,
+    playback_anchor: Arc<RwLock<Option<(f64, std::time::Instant)>>>,
+    history: Arc<HistoryStorage>,
+    cover_cache: Arc<CoverCacheManager>,
 }
 
 impl ShazamPlayer {
@@ -59,12 +65,36 @@ impl ShazamPlayer {
         is_listening: Arc<AtomicBool>,
         engine_status: Arc<RwLock<String>>,
         current_song: Arc<RwLock<Option<RecognizedSong>>>,
+        is_foreground: Arc<AtomicBool>,
+        foreground_notify: Arc<tokio::sync::Notify>,
+        playback_anchor: Arc<RwLock<Option<(f64, std::time::Instant)>>>,
+        history: Arc<HistoryStorage>,
+        cover_cache: Arc<CoverCacheManager>,
     ) -> Self {
         Self {
             is_listening,
             engine_status,
             current_song,
-            downloader: Arc::new(JioSaavnDownloader::new()),
+            downloader: Arc::new(JioSaavnClient::new()),
+            is_foreground,
+            foreground_notify,
+            playback_anchor,
+            history,
+            cover_cache,
+        }
+    }
+
+    /// Enriches history items with local cover art URI if cached on disk
+    fn enrich_history_items(&self, items: &mut [serde_json::Value]) {
+        for item in items {
+            if let Some(obj) = item.as_object_mut() {
+                let key = obj.get("shazam_key").and_then(|v| v.as_str()).unwrap_or("").trim();
+                if !key.is_empty() && key != "0" {
+                    if let Some(local_uri) = self.cover_cache.get_local_uri(key) {
+                        obj.insert("local_cover".to_string(), serde_json::Value::String(local_uri));
+                    }
+                }
+            }
         }
     }
 }
@@ -73,8 +103,7 @@ impl ShazamPlayer {
 impl ShazamPlayer {
     #[zbus(property)]
     async fn playback_status(&self) -> String {
-        let song_guard = self.current_song.read().await;
-        if song_guard.is_some() {
+        if self.is_listening.load(Ordering::Relaxed) {
             "Playing".to_string()
         } else {
             "Paused".to_string()
@@ -103,7 +132,13 @@ impl ShazamPlayer {
 
     #[zbus(property)]
     async fn position(&self) -> i64 {
-        0
+        let guard = self.playback_anchor.read().await;
+        if let Some((offset_sec, instant)) = *guard {
+            let current_sec = offset_sec + instant.elapsed().as_secs_f64();
+            (current_sec * 1_000_000.0) as i64
+        } else {
+            0
+        }
     }
 
     #[zbus(property)]
@@ -129,7 +164,7 @@ impl ShazamPlayer {
         if let Some(song) = song_guard.as_ref() {
             let track_id = format!(
                 "/org/mpris/MediaPlayer2/Track/{}",
-                song.shazam_key.as_deref().unwrap_or("0")
+                song.shazam_key.as_deref().filter(|k| !k.is_empty() && *k != "0").unwrap_or("active")
             );
             map.insert("mpris:trackid".into(), Value::from(track_id));
             map.insert("shazam:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
@@ -142,19 +177,29 @@ impl ShazamPlayer {
             if let Some(genre) = &song.genre {
                 map.insert("xesam:genre".into(), Value::from(vec![genre.clone()]));
             }
-            if let Some(art_url) = song.cover_art_hq_url.as_ref().or(song.cover_art_url.as_ref()) {
-                map.insert("mpris:artUrl".into(), Value::from(art_url.clone()));
-                map.insert("xesam:artUrl".into(), Value::from(art_url.clone()));
+            let art_url = if let Some(key) = song.shazam_key.as_deref().filter(|k| !k.is_empty() && *k != "0") {
+                if let Some(local_uri) = self.cover_cache.get_local_uri(key) {
+                    Some(local_uri)
+                } else {
+                    song.cover_art_hq_url.as_ref().or(song.cover_art_url.as_ref()).cloned()
+                }
+            } else {
+                song.cover_art_hq_url.as_ref().or(song.cover_art_url.as_ref()).cloned()
+            };
+            if let Some(art) = art_url {
+                map.insert("mpris:artUrl".into(), Value::from(art.clone()));
+                map.insert("xesam:artUrl".into(), Value::from(art));
             }
             if let Some(isrc) = &song.isrc {
                 map.insert("shazam:isrc".into(), Value::from(isrc.clone()));
             }
-            if let Some(offset) = song.offset_seconds {
-                map.insert("shazam:offset".into(), Value::from(offset));
-            }
-            if let Some(preview) = &song.preview_audio_url {
-                map.insert("shazam:previewUrl".into(), Value::from(preview.clone()));
-            }
+            let anchor_guard = self.playback_anchor.read().await;
+            let current_offset = if let Some((offset_sec, instant)) = *anchor_guard {
+                offset_sec + instant.elapsed().as_secs_f64()
+            } else {
+                song.offset_seconds.unwrap_or(0.0)
+            };
+            map.insert("shazam:offset".into(), Value::from(current_offset));
             if let Some(yt) = &song.youtube_url {
                 map.insert("shazam:youtubeUrl".into(), Value::from(yt.clone()));
             }
@@ -208,91 +253,69 @@ impl ShazamPlayer {
             }
         };
 
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        let download_dir = PathBuf::from(home).join("Music").join("ShazamLive");
+        let download_dir = JioSaavnClient::get_music_dir();
 
-        match self.downloader.download_song(&title, &artist, download_dir).await {
+        let song = match self.downloader.find_best_match(&title, &artist).await {
+            Ok(s) => s,
+            Err(e) => return format!("Error: {}", e),
+        };
+        match self.downloader.download_song(&song, &download_dir).await {
             Ok(p) => format!("Success: Downloaded to {}", p.display()),
             Err(e) => format!("Error: {}", e),
         }
     }
 
     async fn download_track(&self, title: String, artist: String) -> String {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        let download_dir = PathBuf::from(home).join("Music").join("ShazamLive");
+        let download_dir = JioSaavnClient::get_music_dir();
 
-        match self.downloader.download_song(&title, &artist, download_dir).await {
+        let song = match self.downloader.find_best_match(&title, &artist).await {
+            Ok(s) => s,
+            Err(e) => return format!("Error: {}", e),
+        };
+        match self.downloader.download_song(&song, &download_dir).await {
             Ok(p) => format!("Success: Downloaded to {}", p.display()),
             Err(e) => format!("Error: {}", e),
         }
     }
 
-    async fn get_preview_url(&self) -> String {
-        let guard = self.current_song.read().await;
-        guard.as_ref().and_then(|s| s.preview_audio_url.clone()).unwrap_or_default()
+    async fn get_stream_url(&self, title: String, artist: String) -> String {
+        let song = match self.downloader.find_best_match(&title, &artist).await {
+            Ok(s) => s,
+            Err(_) => return String::new(),
+        };
+        match self.downloader.get_stream_url(&song).await {
+            Ok(info) => info.url,
+            Err(_) => String::new(),
+        }
     }
 
     async fn get_recent_history(&self, limit: u32) -> String {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        let hist_path = PathBuf::from(home).join(".local/share/shazam_history.jsonl");
-        if !hist_path.exists() {
-            return "[]".to_string();
-        }
-        let content = match tokio::fs::read_to_string(&hist_path).await {
-            Ok(c) => c,
-            Err(_) => return "[]".to_string(),
-        };
-        let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-        let take_count = (limit as usize).min(lines.len());
-        let slice = &lines[lines.len() - take_count..];
-        let mut items = Vec::new();
-        for l in slice.iter().rev() {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(l) {
-                items.push(v);
-            }
-        }
+        let mut items = self.history.get_recent(limit as usize);
+        self.enrich_history_items(&mut items);
         serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string())
     }
 
     async fn clear_history(&self) -> bool {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        let hist_jsonl = PathBuf::from(home.clone()).join(".local/share/shazam_history.jsonl");
-        let hist_txt = PathBuf::from(home).join(".local/share/shazam_history.txt");
-        let _ = tokio::fs::remove_file(hist_jsonl).await;
-        let _ = tokio::fs::remove_file(hist_txt).await;
+        self.history.clear();
         true
     }
 
+    async fn delete_history_entry(&self, key_or_title: String, artist: String) -> bool {
+        let artist_opt = if artist.trim().is_empty() { None } else { Some(artist.as_str()) };
+        self.history.delete_entry(&key_or_title, artist_opt)
+    }
+
     async fn search_history(&self, query: String) -> String {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        let hist_path = PathBuf::from(home).join(".local/share/shazam_history.jsonl");
-        if !hist_path.exists() {
-            return "[]".to_string();
-        }
-        let content = match tokio::fs::read_to_string(&hist_path).await {
-            Ok(c) => c,
-            Err(_) => return "[]".to_string(),
-        };
-        let q = query.trim().to_lowercase();
-        let items: Vec<serde_json::Value> = content
-            .lines()
-            .rev()
-            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
-            .filter(|item| {
-                if q.is_empty() {
-                    return true;
-                }
-                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                let artist = item.get("artist").and_then(|v| v.as_str()).unwrap_or("");
-                let album = item.get("album").and_then(|v| v.as_str()).unwrap_or("");
-                let genre = item.get("genre").and_then(|v| v.as_str()).unwrap_or("");
-                title.to_lowercase().contains(&q)
-                    || artist.to_lowercase().contains(&q)
-                    || album.to_lowercase().contains(&q)
-                    || genre.to_lowercase().contains(&q)
-            })
-            .take(100)
-            .collect();
+        let mut items = self.history.search(&query);
+        self.enrich_history_items(&mut items);
         serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    async fn set_foreground(&self, in_foreground: bool) -> bool {
+        self.is_foreground.store(in_foreground, Ordering::Relaxed);
+        if in_foreground {
+            self.foreground_notify.notify_waiters();
+        }
+        true
     }
 }

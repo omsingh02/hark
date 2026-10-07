@@ -1,0 +1,16 @@
+[package]
+name = "shazam-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure DSP landmark audio fingerprinting and domain models for Shazam recognition"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+realfft = "3.4"
+rustfft = "6.4"
+byteorder = "1.5"
+crc32fast = "1.4"
+base64 = "0.22"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"

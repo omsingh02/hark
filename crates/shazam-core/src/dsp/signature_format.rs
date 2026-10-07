@@ -1,8 +1,12 @@
+// Derived from SongRec (https://github.com/marin-m/SongRec) by marin-m,
+// licensed GPL-3.0-or-later.
+
 use base64::Engine;
 use byteorder::{LittleEndian, WriteBytesExt};
 use crc32fast::Hasher;
-use std::error::Error;
 use std::io::{Cursor, Seek, SeekFrom, Write};
+
+use crate::error::CoreError;
 
 pub const DATA_URI_PREFIX: &str = "data:audio/vnd.shazam.sig;base64,";
 
@@ -37,7 +41,7 @@ impl DecodedSignature {
         }
     }
 
-    pub fn encode_to_binary(&self) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
+    pub fn encode_to_binary(&self) -> Result<Vec<u8>, CoreError> {
         let mut cursor = Cursor::new(Vec::with_capacity(1024));
 
         cursor.write_u32::<LittleEndian>(0xcafe2580)?; // magic1
@@ -124,7 +128,7 @@ impl DecodedSignature {
         Ok(cursor.into_inner())
     }
 
-    pub fn encode_to_uri(&self) -> Result<String, Box<dyn Error + Send + Sync>> {
+    pub fn encode_to_uri(&self) -> Result<String, CoreError> {
         let binary = self.encode_to_binary()?;
         let encoded = base64::prelude::BASE64_STANDARD.encode(binary);
         Ok(format!("{}{}", DATA_URI_PREFIX, encoded))

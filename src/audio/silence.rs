@@ -12,6 +12,7 @@ impl Default for SilenceDetector {
 }
 
 impl SilenceDetector {
+    #[allow(dead_code)]
     pub fn new(threshold_dbfs: f32) -> Self {
         Self { threshold_dbfs }
     }

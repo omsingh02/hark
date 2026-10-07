@@ -1,9 +1,13 @@
+// Derived from SongRec (https://github.com/marin-m/SongRec) by marin-m,
+// licensed GPL-3.0-or-later.
+
 use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
 use std::sync::Arc;
 
-use super::hanning::get_hanning_window;
+use super::hanning::HANNING_WINDOW_2048_MULTIPLIERS;
 use super::signature_format::{DecodedSignature, FrequencyBand, FrequencyPeak};
+use crate::error::CoreError;
 
 pub struct SignatureGenerator {
     ring_buffer_of_samples: Box<[i16; 2048]>,
@@ -17,44 +21,90 @@ pub struct SignatureGenerator {
     spread_fft_outputs_index: u8,
     num_spread_ffts_done: u32,
     signature: DecodedSignature,
-    hanning_window: Vec<f32>,
+}
+
+impl Default for SignatureGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn alloc_boxed_array<T: Clone, const N: usize>(val: T) -> Box<[T; N]> {
+    vec![val; N]
+        .into_boxed_slice()
+        .try_into()
+        .unwrap_or_else(|_| panic!("Failed to allocate heap array of size {}", N))
 }
 
 impl SignatureGenerator {
-    pub fn new(num_samples: u32) -> Self {
+    pub fn new() -> Self {
         let mut planner = RealFftPlanner::<f32>::new();
         let fft_forward = planner.plan_fft_forward(2048);
         Self {
-            ring_buffer_of_samples: Box::new([0i16; 2048]),
+            ring_buffer_of_samples: alloc_boxed_array(0i16),
             ring_buffer_of_samples_index: 0,
-            reordered_ring_buffer_of_samples: Box::new([0.0f32; 2048]),
-            complex_fft_output: Box::new([Complex::new(0.0, 0.0); 1025]),
-            fft_outputs: Box::new([[0.0f32; 1025]; 256]),
+            reordered_ring_buffer_of_samples: alloc_boxed_array(0.0f32),
+            complex_fft_output: alloc_boxed_array(Complex::new(0.0, 0.0)),
+            fft_outputs: alloc_boxed_array([0.0f32; 1025]),
             fft_outputs_index: 0,
             fft_forward,
-            spread_fft_outputs: Box::new([[0.0f32; 1025]; 256]),
+            spread_fft_outputs: alloc_boxed_array([0.0f32; 1025]),
             spread_fft_outputs_index: 0,
             num_spread_ffts_done: 0,
-            signature: DecodedSignature::new(16000, num_samples),
-            hanning_window: get_hanning_window(),
+            signature: DecodedSignature::new(16000, 0),
         }
     }
 
-    pub fn make_signature_from_i16_buffer(buffer: &[i16]) -> DecodedSignature {
-        let mut generator = SignatureGenerator::new(buffer.len() as u32);
+    /// Resets the internal state to process a fresh audio segment.
+    fn reset(&mut self, num_samples: u32) {
+        self.ring_buffer_of_samples.fill(0);
+        self.ring_buffer_of_samples_index = 0;
+        self.reordered_ring_buffer_of_samples.fill(0.0);
+        self.complex_fft_output.fill(Complex::new(0.0, 0.0));
+        self.fft_outputs.fill([0.0; 1025]);
+        self.fft_outputs_index = 0;
+        self.spread_fft_outputs.fill([0.0; 1025]);
+        self.spread_fft_outputs_index = 0;
+        self.num_spread_ffts_done = 0;
+        self.signature = DecodedSignature::new(16000, num_samples);
+    }
+
+    /// Generates a Shazam signature Data URI from contiguous 16kHz mono PCM i16 samples, reusing internal buffers.
+    pub fn generate_signature(&mut self, buffer: &[i16]) -> Result<String, CoreError> {
+        if buffer.len() < 128 * 46 {
+            return Err(CoreError::BufferTooShort {
+                expected: 128 * 46,
+                actual: buffer.len(),
+            });
+        }
+
+        self.reset(buffer.len() as u32);
+
         let chunks_count = buffer.len() / 128;
         for i in 0..chunks_count {
             let chunk = &buffer[i * 128..(i + 1) * 128];
             let mut array_chunk = [0i16; 128];
             array_chunk.copy_from_slice(chunk);
-            generator.do_fft(&array_chunk);
-            generator.do_peak_spreading();
-            generator.num_spread_ffts_done += 1;
-            if generator.num_spread_ffts_done >= 46 {
-                generator.do_peak_recognition();
+            self.do_fft(&array_chunk);
+            self.do_peak_spreading();
+            self.num_spread_ffts_done += 1;
+            if self.num_spread_ffts_done >= 46 {
+                self.do_peak_recognition();
             }
         }
-        generator.signature
+
+        self.signature.encode_to_uri()
+    }
+
+    /// Generates a Shazam signature Data URI, compatible with the legacy SignatureGenerator interface.
+    pub fn generate_from_i16(&self, buffer: &[i16]) -> Option<String> {
+        Self::make_signature(buffer).ok()
+    }
+
+    /// Convenience one-shot function to generate a Shazam signature Data URI from PCM samples.
+    pub fn make_signature(buffer: &[i16]) -> Result<String, CoreError> {
+        let mut generator = Self::new();
+        generator.generate_signature(buffer)
     }
 
     fn do_fft(&mut self, s16_mono_16khz_buffer: &[i16; 128]) {
@@ -65,7 +115,7 @@ impl SignatureGenerator {
         self.ring_buffer_of_samples_index += 128;
         self.ring_buffer_of_samples_index &= 2047;
 
-        for (index, multiplier) in self.hanning_window.iter().enumerate() {
+        for (index, multiplier) in HANNING_WINDOW_2048_MULTIPLIERS.iter().enumerate() {
             self.reordered_ring_buffer_of_samples[index] = self.ring_buffer_of_samples
                 [(index + self.ring_buffer_of_samples_index) & 2047]
                 as f32
