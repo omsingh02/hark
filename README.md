@@ -2,7 +2,7 @@
 
 A high-performance, real-time audio recognition daemon and native D-Bus MPRIS2 service written in Rust.
 
-Reverse-engineers the Shazam landmark audio fingerprinting protocol to perform continuous, low-latency song identification directly from desktop audio output or microphone streams.
+Performs continuous, low-latency song identification directly from desktop audio output or microphone streams, using a Rust port of the Shazam landmark fingerprinting that [SongRec](https://github.com/marin-m/SongRec) reverse-engineered.
 
 ---
 
@@ -90,6 +90,18 @@ Add the custom module to your Waybar `config.jsonc`:
 
 ---
 
+## 🗂️ Project Layout
+
+```
+crates/shazam-core   landmark fingerprinting (FFT, signature encoding) and Shazam response models
+crates/jiosaavn      JioSaavn search, streaming and tagging client
+src/                 the daemon: audio capture, MPRIS2 service, history, cover-art cache, Shazam client
+```
+
+---
+
 ## 📜 License
 
-GPL-3.0 License
+GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+The fingerprinting code in `crates/shazam-core/src/dsp` is derived from [SongRec](https://github.com/marin-m/SongRec) by marin-m, which is licensed GPL-3.0-or-later.
