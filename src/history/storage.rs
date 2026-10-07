@@ -52,7 +52,11 @@ impl HistoryStorage {
     /// Checks if a stored JSON record matches a RecognizedSong instance
     pub fn is_same_song(stored: &serde_json::Value, song: &RecognizedSong) -> bool {
         // 1. Match by Apple Shazam key
-        let stored_key = stored.get("shazam_key").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let stored_key = stored
+            .get("shazam_key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         if !stored_key.is_empty() {
             if let Some(ref song_key) = song.shazam_key {
                 if stored_key == song_key.trim() {
@@ -62,7 +66,11 @@ impl HistoryStorage {
         }
 
         // 2. Match by standard ISRC code
-        let stored_isrc = stored.get("isrc").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let stored_isrc = stored
+            .get("isrc")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         if !stored_isrc.is_empty() {
             if let Some(ref song_isrc) = song.isrc {
                 if stored_isrc == song_isrc.trim() {
@@ -100,8 +108,16 @@ impl HistoryStorage {
 
     /// Checks if two JSON records represent the same song
     pub fn are_same_entries(a: &serde_json::Value, b: &serde_json::Value) -> bool {
-        let a_key = a.get("shazam_key").and_then(|v| v.as_str()).unwrap_or("").trim();
-        let b_key = b.get("shazam_key").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let a_key = a
+            .get("shazam_key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        let b_key = b
+            .get("shazam_key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         if !a_key.is_empty() && !b_key.is_empty() && a_key == b_key {
             return true;
         }
@@ -217,7 +233,12 @@ impl HistoryStorage {
     fn atomic_save(&self, entries: &[serde_json::Value]) {
         // 1. Atomic write to JSONL
         let temp_jsonl = self.jsonl_path.with_extension("jsonl.tmp");
-        if let Ok(mut file) = OpenOptions::new().create(true).write(true).truncate(true).open(&temp_jsonl) {
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&temp_jsonl)
+        {
             for entry in entries {
                 if let Ok(serialized) = serde_json::to_string(entry) {
                     let _ = writeln!(file, "{}", serialized);
@@ -230,9 +251,17 @@ impl HistoryStorage {
 
         // 2. Atomic write to TXT
         let temp_txt = self.txt_path.with_extension("txt.tmp");
-        if let Ok(mut file) = OpenOptions::new().create(true).write(true).truncate(true).open(&temp_txt) {
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&temp_txt)
+        {
             for entry in entries {
-                let ts = entry.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
+                let ts = entry
+                    .get("timestamp")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let a = entry.get("artist").and_then(|v| v.as_str()).unwrap_or("");
                 let t = entry.get("title").and_then(|v| v.as_str()).unwrap_or("");
                 let _ = writeln!(file, "[{}] {} - {}", ts, a, t);
@@ -348,7 +377,9 @@ pub fn extract_base_title(title: &str) -> String {
 
 pub fn extract_lead_artist(artist: &str) -> String {
     let mut s = artist.to_lowercase();
-    for delim in &[" & ", " and ", ",", " feat ", " feat. ", " ft ", " ft. ", " x ", " vs "] {
+    for delim in &[
+        " & ", " and ", ",", " feat ", " feat. ", " ft ", " ft. ", " x ", " vs ",
+    ] {
         if let Some(pos) = s.find(delim) {
             s.truncate(pos);
         }
@@ -475,7 +506,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("hark_{}_{}_{}", tag, std::process::id(), nanos));
+        let dir =
+            std::env::temp_dir().join(format!("hark_{}_{}_{}", tag, std::process::id(), nanos));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -494,13 +526,20 @@ mod tests {
         let data = scratch_data_dir("legacy");
         let line = r#"{"timestamp":"2026-01-01 00:00:00","title":"Old Song","artist":"Old Artist","album":"","genre":"","isrc":"","shazam_key":"42","cover_art":"","offset":0.0,"preview_url":"","youtube_url":"","share_url":"","lyrics":[]}"#;
         std::fs::write(data.join("shazam_history.jsonl"), format!("{line}\n")).unwrap();
-        std::fs::write(data.join("shazam_history.txt"), "[2026-01-01 00:00:00] Old Artist - Old Song\n").unwrap();
+        std::fs::write(
+            data.join("shazam_history.txt"),
+            "[2026-01-01 00:00:00] Old Artist - Old Song\n",
+        )
+        .unwrap();
 
         let storage = HistoryStorage::open(&data);
         let recent = storage.get_recent(10);
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0]["title"], "Old Song");
-        assert!(data.join("shazam_history.jsonl").exists(), "legacy file must be left in place");
+        assert!(
+            data.join("shazam_history.jsonl").exists(),
+            "legacy file must be left in place"
+        );
 
         let _ = std::fs::remove_dir_all(data);
     }

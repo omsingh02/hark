@@ -1,9 +1,9 @@
-use std::path::{Path, PathBuf};
 use reqwest::Client;
+use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
-use crate::models::{AuthTokenResponse, JioSaavnSong, SearchResultsResponse, StreamInfo};
 use crate::matching::select_best_match;
+use crate::models::{AuthTokenResponse, JioSaavnSong, SearchResultsResponse, StreamInfo};
 use crate::tagger::tag_m4a_file;
 
 const API_ENDPOINT: &str = "https://www.jiosaavn.com/api.php";
@@ -33,7 +33,9 @@ impl JioSaavnClient {
     /// Searches JioSaavn catalog and returns up to `limit` candidates.
     pub async fn search(&self, query: &str, limit: usize) -> Result<Vec<JioSaavnSong>, String> {
         let n_str = limit.to_string();
-        let resp = self.client.get(API_ENDPOINT)
+        let resp = self
+            .client
+            .get(API_ENDPOINT)
             .query(&[
                 ("__call", "search.getResults"),
                 ("_format", "json"),
@@ -47,7 +49,9 @@ impl JioSaavnClient {
             .await
             .map_err(|e| format!("Search request failed: {}", e))?;
 
-        let json_text = resp.text().await
+        let json_text = resp
+            .text()
+            .await
             .map_err(|e| format!("Failed to read search body: {}", e))?;
 
         let parsed: SearchResultsResponse = serde_json::from_str(&json_text)
@@ -67,11 +71,15 @@ impl JioSaavnClient {
 
     /// Resolves the direct CDN audio stream URL using bitrate waterfall (320 -> 160 -> 128 -> 96).
     pub async fn get_stream_url(&self, song: &JioSaavnSong) -> Result<StreamInfo, String> {
-        let enc_url = song.encrypted_media_url.as_deref()
+        let enc_url = song
+            .encrypted_media_url
+            .as_deref()
             .ok_or_else(|| "Track has no encrypted_media_url".to_string())?;
 
         for &bitrate in BITRATE_WATERFALL {
-            let resp = self.client.post(API_ENDPOINT)
+            let resp = self
+                .client
+                .post(API_ENDPOINT)
                 .form(&[
                     ("__call", "song.generateAuthToken"),
                     ("url", enc_url),
@@ -102,15 +110,27 @@ impl JioSaavnClient {
             }
         }
 
-        Err(format!("Failed to resolve stream URL for track: {}", song.clean_title()))
+        Err(format!(
+            "Failed to resolve stream URL for track: {}",
+            song.clean_title()
+        ))
     }
 
     /// Downloads and tags a song atomically into `download_dir`.
-    pub async fn download_song(&self, song: &JioSaavnSong, download_dir: &Path) -> Result<PathBuf, String> {
+    pub async fn download_song(
+        &self,
+        song: &JioSaavnSong,
+        download_dir: &Path,
+    ) -> Result<PathBuf, String> {
         let stream_info = self.get_stream_url(song).await?;
 
-        tokio::fs::create_dir_all(download_dir).await
-            .map_err(|e| format!("Failed to create download dir {}: {}", download_dir.display(), e))?;
+        tokio::fs::create_dir_all(download_dir).await.map_err(|e| {
+            format!(
+                "Failed to create download dir {}: {}",
+                download_dir.display(),
+                e
+            )
+        })?;
 
         let clean_t = song.clean_title();
         let clean_a = song.clean_artist();
@@ -124,7 +144,9 @@ impl JioSaavnClient {
         let part_path = download_dir.join(&part_filename);
 
         // Stream download chunk-by-chunk to .part temporary file (no full-buffer in RAM)
-        let resp = self.client.get(&stream_info.url)
+        let resp = self
+            .client
+            .get(&stream_info.url)
             .header("Referer", JIOSAAVN_REFERER)
             .send()
             .await
@@ -134,15 +156,22 @@ impl JioSaavnClient {
             return Err(format!("Stream CDN returned HTTP {}", resp.status()));
         }
 
-        let mut file = tokio::fs::File::create(&part_path).await
+        let mut file = tokio::fs::File::create(&part_path)
+            .await
             .map_err(|e| format!("Failed to create temp file {}: {}", part_path.display(), e))?;
 
         let mut resp = resp;
-        while let Some(chunk) = resp.chunk().await.map_err(|e| format!("Download stream error: {}", e))? {
-            file.write_all(&chunk).await
+        while let Some(chunk) = resp
+            .chunk()
+            .await
+            .map_err(|e| format!("Download stream error: {}", e))?
+        {
+            file.write_all(&chunk)
+                .await
                 .map_err(|e| format!("Failed to write chunk: {}", e))?;
         }
-        file.flush().await
+        file.flush()
+            .await
             .map_err(|e| format!("Failed to flush temp file: {}", e))?;
         drop(file);
 
@@ -163,14 +192,27 @@ impl JioSaavnClient {
             .map_err(|e| format!("Tagging failed for {}: {}", part_path.display(), e))?;
 
         // Atomically rename .part to final destination
-        tokio::fs::rename(&part_path, &final_path).await
-            .map_err(|e| format!("Failed to rename {} to {}: {}", part_path.display(), final_path.display(), e))?;
+        tokio::fs::rename(&part_path, &final_path)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Failed to rename {} to {}: {}",
+                    part_path.display(),
+                    final_path.display(),
+                    e
+                )
+            })?;
 
         Ok(final_path)
     }
 
     /// Fast lookup: checks if matching file is already cached; if not, downloads and tags.
-    pub async fn ensure_song(&self, title: &str, artist: &str, download_dir: &Path) -> Result<PathBuf, String> {
+    pub async fn ensure_song(
+        &self,
+        title: &str,
+        artist: &str,
+        download_dir: &Path,
+    ) -> Result<PathBuf, String> {
         let search_t = title.trim().to_lowercase();
         if let Ok(mut entries) = tokio::fs::read_dir(download_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {

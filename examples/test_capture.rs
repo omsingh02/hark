@@ -1,9 +1,9 @@
-use std::time::Duration;
-use reqwest::Client;
-use serde_json::json;
-use uuid::Uuid;
 use hark::audio::{AudioCapture, AudioSourceMode, SilenceDetector};
 use hark::dsp::SignatureGenerator;
+use reqwest::Client;
+use serde_json::json;
+use std::time::Duration;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -15,7 +15,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Capturing audio from microphone for 6 seconds...");
     for i in 1..=6 {
         tokio::time::sleep(Duration::from_secs(1)).await;
-        println!("  Elapsed: {}s, ring buffer sample count: {}", i, capture.sample_count());
+        println!(
+            "  Elapsed: {}s, ring buffer sample count: {}",
+            i,
+            capture.sample_count()
+        );
     }
 
     let samples = capture.extract_chunk(6);
@@ -24,10 +28,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Save raw PCM i16 to /tmp/captured_live.pcm
     let pcm_bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
     let _ = std::fs::write("/tmp/captured_live.pcm", &pcm_bytes);
-    println!("Saved {} bytes raw PCM to /tmp/captured_live.pcm", pcm_bytes.len());
+    println!(
+        "Saved {} bytes raw PCM to /tmp/captured_live.pcm",
+        pcm_bytes.len()
+    );
 
     let (is_silent, dbfs) = silence.is_silent(&samples);
-    println!("Silence check: is_silent={}, dbfs={:.2} dBFS", is_silent, dbfs);
+    println!(
+        "Silence check: is_silent={}, dbfs={:.2} dBFS",
+        is_silent, dbfs
+    );
 
     let sig_uri = sig_gen.generate_from_i16(&samples);
     match sig_uri {
@@ -65,7 +75,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let start = std::time::Instant::now();
             let response = client
                 .post(&url)
-                .header("User-Agent", "Dalvik/2.1.0 (Linux; U; Android 6.0.1; SM-G920F Build/MMB29K)")
+                .header(
+                    "User-Agent",
+                    "Dalvik/2.1.0 (Linux; U; Android 6.0.1; SM-G920F Build/MMB29K)",
+                )
                 .header("Content-Type", "application/json")
                 .header("Content-Language", "en_US")
                 .json(&payload)
@@ -76,7 +89,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let status = response.status();
             println!("HTTP Status: {} in {:.3}s", status, duration.as_secs_f32());
             let body = response.text().await?;
-            println!("Raw Response Body (first 1000 chars):\n{}", &body[..1000.min(body.len())]);
+            println!(
+                "Raw Response Body (first 1000 chars):\n{}",
+                &body[..1000.min(body.len())]
+            );
         }
         None => {
             println!("Failed to generate signature from samples.");

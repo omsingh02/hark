@@ -1,8 +1,8 @@
+use crate::audio::resampler::AudioResampler;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use crate::audio::resampler::AudioResampler;
 
 const SAMPLE_RATE: usize = 16000;
 const BUFFER_SECS: usize = 12;
@@ -103,9 +103,7 @@ impl AudioCapture {
 
     fn select_device(host: &cpal::Host, mode: AudioSourceMode) -> Option<cpal::Device> {
         match mode {
-            AudioSourceMode::Mic | AudioSourceMode::Auto => {
-                host.default_input_device()
-            }
+            AudioSourceMode::Mic | AudioSourceMode::Auto => host.default_input_device(),
             AudioSourceMode::Monitor => {
                 // Look for an input device containing "monitor"
                 if let Ok(devices) = host.input_devices() {
@@ -173,7 +171,8 @@ impl AudioCapture {
                     device.build_input_stream(
                         &config.into(),
                         move |data: &[f32], _| {
-                            let pcm16 = AudioResampler::resample_to_16k_mono(data, channels, sample_rate);
+                            let pcm16 =
+                                AudioResampler::resample_to_16k_mono(data, channels, sample_rate);
                             if let Ok(mut lock) = ring.lock() {
                                 lock.push_slice(&pcm16);
                             }
@@ -187,8 +186,13 @@ impl AudioCapture {
                     device.build_input_stream(
                         &config.into(),
                         move |data: &[i16], _| {
-                            let f32_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
-                            let pcm16 = AudioResampler::resample_to_16k_mono(&f32_data, channels, sample_rate);
+                            let f32_data: Vec<f32> =
+                                data.iter().map(|&s| s as f32 / 32768.0).collect();
+                            let pcm16 = AudioResampler::resample_to_16k_mono(
+                                &f32_data,
+                                channels,
+                                sample_rate,
+                            );
                             if let Ok(mut lock) = ring.lock() {
                                 lock.push_slice(&pcm16);
                             }

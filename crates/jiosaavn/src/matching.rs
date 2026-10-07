@@ -49,12 +49,27 @@ pub fn score_candidate(candidate: &JioSaavnSong, target_title: &str, target_arti
     // Baseline weighted score: 60% title, 40% artist
     let mut score = (title_sim * 0.6) + (artist_sim * 0.4);
 
-    let lower_cand = format!("{} {}", cand_title.to_lowercase(), cand_artist.to_lowercase());
-    let lower_target = format!("{} {}", target_title.to_lowercase(), target_artist.to_lowercase());
+    let lower_cand = format!(
+        "{} {}",
+        cand_title.to_lowercase(),
+        cand_artist.to_lowercase()
+    );
+    let lower_target = format!(
+        "{} {}",
+        target_title.to_lowercase(),
+        target_artist.to_lowercase()
+    );
 
     // Penalty for undesirable variations (karaoke, tribute, instrumental, cover)
     // unless the target specifically asked for them
-    let noise_words = ["karaoke", "tribute", "instrumental", "cover", "recreation", "parody"];
+    let noise_words = [
+        "karaoke",
+        "tribute",
+        "instrumental",
+        "cover",
+        "recreation",
+        "parody",
+    ];
     for word in &noise_words {
         if lower_cand.contains(word) && !lower_target.contains(word) {
             score *= 0.3; // 70% penalty
@@ -70,7 +85,11 @@ pub fn score_candidate(candidate: &JioSaavnSong, target_title: &str, target_arti
 }
 
 /// Selects the best matching candidate from a list of JioSaavn songs.
-pub fn select_best_match(candidates: Vec<JioSaavnSong>, target_title: &str, target_artist: &str) -> Option<JioSaavnSong> {
+pub fn select_best_match(
+    candidates: Vec<JioSaavnSong>,
+    target_title: &str,
+    target_artist: &str,
+) -> Option<JioSaavnSong> {
     if candidates.is_empty() {
         return None;
     }
@@ -114,7 +133,11 @@ mod tests {
             language: None,
             copyright_text: None,
             duration: None,
-            is_320kbps: Some(if is_320 { "true".into() } else { "false".into() }),
+            is_320kbps: Some(if is_320 {
+                "true".into()
+            } else {
+                "false".into()
+            }),
             image: None,
             encrypted_media_url: Some("enc_dummy".into()),
             media_preview_url: None,

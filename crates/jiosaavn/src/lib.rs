@@ -1,9 +1,9 @@
-pub mod models;
-pub mod matching;
-pub mod tagger;
 pub mod client;
+pub mod matching;
+pub mod models;
+pub mod tagger;
 
-pub use models::{JioSaavnSong, SearchResultsResponse, StreamInfo, unescape_html};
-pub use matching::{score_candidate, select_best_match, normalize, token_similarity};
-pub use tagger::tag_m4a_file;
 pub use client::JioSaavnClient;
+pub use matching::{normalize, score_candidate, select_best_match, token_similarity};
+pub use models::{unescape_html, JioSaavnSong, SearchResultsResponse, StreamInfo};
+pub use tagger::tag_m4a_file;

@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use jiosaavn::JioSaavnClient;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "jiosaavn")]
@@ -19,10 +19,7 @@ enum Commands {
         limit: usize,
     },
     /// Resolve direct CDN stream URL with bitrate waterfall (320 -> 160 -> 128 -> 96)
-    StreamUrl {
-        title: String,
-        artist: String,
-    },
+    StreamUrl { title: String, artist: String },
     /// Download and tag song with full metadata & album art
     Download {
         title: String,
@@ -68,13 +65,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::StreamUrl { title, artist } => {
             let song = client.find_best_match(&title, &artist).await?;
             let info = client.get_stream_url(&song).await?;
-            println!("Matched Track: {} - {}", song.clean_title(), song.clean_artist());
+            println!(
+                "Matched Track: {} - {}",
+                song.clean_title(),
+                song.clean_artist()
+            );
             println!("Bitrate: {}kbps", info.bitrate_kbps);
             println!("Stream URL: {}", info.url);
         }
         Commands::Download { title, artist, out } => {
             let out_dir = out.unwrap_or_else(JioSaavnClient::get_music_dir);
-            println!("Finding & downloading '{} - {}' to {}...", title, artist, out_dir.display());
+            println!(
+                "Finding & downloading '{} - {}' to {}...",
+                title,
+                artist,
+                out_dir.display()
+            );
             let song = client.find_best_match(&title, &artist).await?;
             let path = client.download_song(&song, &out_dir).await?;
             println!("Successfully saved: {}", path.display());

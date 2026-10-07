@@ -1,7 +1,11 @@
-use std::path::Path;
 use crate::models::JioSaavnSong;
+use std::path::Path;
 
-pub fn tag_m4a_file(path: &Path, song: &JioSaavnSong, cover_bytes: Option<&[u8]>) -> Result<(), String> {
+pub fn tag_m4a_file(
+    path: &Path,
+    song: &JioSaavnSong,
+    cover_bytes: Option<&[u8]>,
+) -> Result<(), String> {
     let mut tag = mp4ameta::Tag::read_from_path(path)
         .map_err(|e| format!("Failed to read MP4 tags from {}: {}", path.display(), e))?;
 

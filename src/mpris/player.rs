@@ -88,10 +88,17 @@ impl HarkPlayer {
     fn enrich_history_items(&self, items: &mut [serde_json::Value]) {
         for item in items {
             if let Some(obj) = item.as_object_mut() {
-                let key = obj.get("shazam_key").and_then(|v| v.as_str()).unwrap_or("").trim();
+                let key = obj
+                    .get("shazam_key")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .trim();
                 if !key.is_empty() && key != "0" {
                     if let Some(local_uri) = self.cover_cache.get_local_uri(key) {
-                        obj.insert("local_cover".to_string(), serde_json::Value::String(local_uri));
+                        obj.insert(
+                            "local_cover".to_string(),
+                            serde_json::Value::String(local_uri),
+                        );
                     }
                 }
             }
@@ -164,12 +171,21 @@ impl HarkPlayer {
         if let Some(song) = song_guard.as_ref() {
             let track_id = format!(
                 "/org/mpris/MediaPlayer2/Track/{}",
-                song.shazam_key.as_deref().filter(|k| !k.is_empty() && *k != "0").unwrap_or("active")
+                song.shazam_key
+                    .as_deref()
+                    .filter(|k| !k.is_empty() && *k != "0")
+                    .unwrap_or("active")
             );
             map.insert("mpris:trackid".into(), Value::from(track_id));
-            map.insert("hark:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
+            map.insert(
+                "hark:engineStatus".into(),
+                Value::from(self.engine_status.read().await.clone()),
+            );
             map.insert("xesam:title".into(), Value::from(song.title.clone()));
-            map.insert("xesam:artist".into(), Value::from(vec![song.artist.clone()]));
+            map.insert(
+                "xesam:artist".into(),
+                Value::from(vec![song.artist.clone()]),
+            );
 
             if let Some(album) = &song.album {
                 map.insert("xesam:album".into(), Value::from(album.clone()));
@@ -177,14 +193,24 @@ impl HarkPlayer {
             if let Some(genre) = &song.genre {
                 map.insert("xesam:genre".into(), Value::from(vec![genre.clone()]));
             }
-            let art_url = if let Some(key) = song.shazam_key.as_deref().filter(|k| !k.is_empty() && *k != "0") {
+            let art_url = if let Some(key) = song
+                .shazam_key
+                .as_deref()
+                .filter(|k| !k.is_empty() && *k != "0")
+            {
                 if let Some(local_uri) = self.cover_cache.get_local_uri(key) {
                     Some(local_uri)
                 } else {
-                    song.cover_art_hq_url.as_ref().or(song.cover_art_url.as_ref()).cloned()
+                    song.cover_art_hq_url
+                        .as_ref()
+                        .or(song.cover_art_url.as_ref())
+                        .cloned()
                 }
             } else {
-                song.cover_art_hq_url.as_ref().or(song.cover_art_url.as_ref()).cloned()
+                song.cover_art_hq_url
+                    .as_ref()
+                    .or(song.cover_art_url.as_ref())
+                    .cloned()
             };
             if let Some(art) = art_url {
                 map.insert("mpris:artUrl".into(), Value::from(art.clone()));
@@ -210,7 +236,10 @@ impl HarkPlayer {
                 map.insert("hark:lyrics".into(), Value::from(lyrics.join("\n")));
             }
         } else {
-            map.insert("hark:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
+            map.insert(
+                "hark:engineStatus".into(),
+                Value::from(self.engine_status.read().await.clone()),
+            );
             map.insert(
                 "mpris:trackid".into(),
                 Value::from("/org/mpris/MediaPlayer2/Track/none".to_string()),
@@ -222,13 +251,17 @@ impl HarkPlayer {
 
     async fn play(&self) {
         if !self.is_listening.load(Ordering::Relaxed) {
-            unsafe { libc::kill(libc::getpid(), libc::SIGUSR1); }
+            unsafe {
+                libc::kill(libc::getpid(), libc::SIGUSR1);
+            }
         }
     }
 
     async fn pause(&self) {
         if self.is_listening.load(Ordering::Relaxed) {
-            unsafe { libc::kill(libc::getpid(), libc::SIGUSR1); }
+            unsafe {
+                libc::kill(libc::getpid(), libc::SIGUSR1);
+            }
         }
     }
 
@@ -240,7 +273,9 @@ impl HarkPlayer {
 
     async fn stop(&self) {
         if self.is_listening.load(Ordering::Relaxed) {
-            unsafe { libc::kill(libc::getpid(), libc::SIGUSR1); }
+            unsafe {
+                libc::kill(libc::getpid(), libc::SIGUSR1);
+            }
         }
     }
 
@@ -301,7 +336,11 @@ impl HarkPlayer {
     }
 
     async fn delete_history_entry(&self, key_or_title: String, artist: String) -> bool {
-        let artist_opt = if artist.trim().is_empty() { None } else { Some(artist.as_str()) };
+        let artist_opt = if artist.trim().is_empty() {
+            None
+        } else {
+            Some(artist.as_str())
+        };
         self.history.delete_entry(&key_or_title, artist_opt)
     }
 

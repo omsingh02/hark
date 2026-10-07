@@ -3,11 +3,7 @@ pub struct AudioResampler;
 
 impl AudioResampler {
     /// Resamples an interleaved PCM buffer of any channel count and sample rate to 16 kHz Mono i16.
-    pub fn resample_to_16k_mono(
-        input: &[f32],
-        channels: u16,
-        source_rate: u32,
-    ) -> Vec<i16> {
+    pub fn resample_to_16k_mono(input: &[f32], channels: u16, source_rate: u32) -> Vec<i16> {
         if input.is_empty() {
             return Vec::new();
         }
@@ -44,7 +40,11 @@ impl AudioResampler {
             let frac = (src_idx - (idx0 as f64)) as f32;
 
             let s0 = if idx0 < mono.len() { mono[idx0] } else { 0.0 };
-            let s1 = if idx0 + 1 < mono.len() { mono[idx0 + 1] } else { s0 };
+            let s1 = if idx0 + 1 < mono.len() {
+                mono[idx0 + 1]
+            } else {
+                s0
+            };
 
             // Linear interpolation between samples
             let sample = s0 + frac * (s1 - s0);

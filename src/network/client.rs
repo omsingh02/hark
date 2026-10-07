@@ -117,14 +117,54 @@ struct LocationData {
 }
 
 const LOCATIONS: &[LocationData] = &[
-    LocationData { lat: 51.5074, lon: -0.1278, alt: 25, tz: "Europe/London" },
-    LocationData { lat: 48.8566, lon: 2.3522, alt: 35, tz: "Europe/Paris" },
-    LocationData { lat: 40.7128, lon: -74.0060, alt: 10, tz: "America/New_York" },
-    LocationData { lat: 34.0522, lon: -118.2437, alt: 89, tz: "America/Los_Angeles" },
-    LocationData { lat: 28.6139, lon: 77.2090, alt: 216, tz: "Asia/Kolkata" },
-    LocationData { lat: 35.6762, lon: 139.6503, alt: 40, tz: "Asia/Tokyo" },
-    LocationData { lat: 52.5200, lon: 13.4050, alt: 34, tz: "Europe/Berlin" },
-    LocationData { lat: 41.8781, lon: -87.6298, alt: 182, tz: "America/Chicago" },
+    LocationData {
+        lat: 51.5074,
+        lon: -0.1278,
+        alt: 25,
+        tz: "Europe/London",
+    },
+    LocationData {
+        lat: 48.8566,
+        lon: 2.3522,
+        alt: 35,
+        tz: "Europe/Paris",
+    },
+    LocationData {
+        lat: 40.7128,
+        lon: -74.0060,
+        alt: 10,
+        tz: "America/New_York",
+    },
+    LocationData {
+        lat: 34.0522,
+        lon: -118.2437,
+        alt: 89,
+        tz: "America/Los_Angeles",
+    },
+    LocationData {
+        lat: 28.6139,
+        lon: 77.2090,
+        alt: 216,
+        tz: "Asia/Kolkata",
+    },
+    LocationData {
+        lat: 35.6762,
+        lon: 139.6503,
+        alt: 40,
+        tz: "Asia/Tokyo",
+    },
+    LocationData {
+        lat: 52.5200,
+        lon: 13.4050,
+        alt: 34,
+        tz: "Europe/Berlin",
+    },
+    LocationData {
+        lat: 41.8781,
+        lon: -87.6298,
+        alt: 182,
+        tz: "America/Chicago",
+    },
 ];
 
 pub struct ShazamClient {
@@ -149,7 +189,9 @@ impl ShazamClient {
     ) -> Result<Option<RecognizedSong>, Box<dyn std::error::Error + Send + Sync>> {
         let mut rng = rand::thread_rng();
 
-        let ua = ANDROID_USER_AGENTS.choose(&mut rng).unwrap_or(&ANDROID_USER_AGENTS[0]);
+        let ua = ANDROID_USER_AGENTS
+            .choose(&mut rng)
+            .unwrap_or(&ANDROID_USER_AGENTS[0]);
         let loc = LOCATIONS.choose(&mut rng).unwrap_or(&LOCATIONS[0]);
 
         let now_sec = chrono::Utc::now().timestamp();

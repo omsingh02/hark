@@ -107,7 +107,9 @@ impl RecognizedSong {
     pub fn from_shazam_response(resp: ShazamResponse) -> Option<Self> {
         let track = resp.track?;
         let title = track.title.unwrap_or_else(|| "Unknown Title".to_string());
-        let artist = track.subtitle.unwrap_or_else(|| "Unknown Artist".to_string());
+        let artist = track
+            .subtitle
+            .unwrap_or_else(|| "Unknown Artist".to_string());
 
         let mut album = None;
         let mut lyrics = None;
@@ -118,7 +120,11 @@ impl RecognizedSong {
                 if section.section_type.as_deref() == Some("SONG") {
                     if let Some(meta) = section.metadata {
                         for m in meta {
-                            if m.title.as_deref().map(|t| t.eq_ignore_ascii_case("album")).unwrap_or(false) {
+                            if m.title
+                                .as_deref()
+                                .map(|t| t.eq_ignore_ascii_case("album"))
+                                .unwrap_or(false)
+                            {
                                 album = m.text;
                             }
                         }
@@ -141,15 +147,26 @@ impl RecognizedSong {
 
         let genre = track.genres.and_then(|g| g.primary);
         let cover_art_url = track.images.as_ref().and_then(|img| img.coverart.clone());
-        let cover_art_hq_url = track.images.as_ref().and_then(|img| img.coverarthq.clone().or_else(|| img.coverart.clone()));
+        let cover_art_hq_url = track
+            .images
+            .as_ref()
+            .and_then(|img| img.coverarthq.clone().or_else(|| img.coverart.clone()));
 
-        let offset_seconds = resp.matches.as_ref().and_then(|m| m.first()).and_then(|m| m.offset);
+        let offset_seconds = resp
+            .matches
+            .as_ref()
+            .and_then(|m| m.first())
+            .and_then(|m| m.offset);
 
         let preview_audio_url = track.hub.as_ref().and_then(|hub| {
             hub.actions.as_ref().and_then(|actions| {
                 actions.iter().find_map(|act| {
                     if act.action_type.as_deref() == Some("uri")
-                        && act.uri.as_deref().map(|u| u.ends_with(".m4a") || u.contains("itunes.apple.com")).unwrap_or(false)
+                        && act
+                            .uri
+                            .as_deref()
+                            .map(|u| u.ends_with(".m4a") || u.contains("itunes.apple.com"))
+                            .unwrap_or(false)
                     {
                         act.uri.clone()
                     } else {

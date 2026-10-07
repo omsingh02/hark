@@ -1,4 +1,4 @@
-use jiosaavn::{JioSaavnClient, unescape_html, token_similarity};
+use jiosaavn::{token_similarity, unescape_html, JioSaavnClient};
 
 #[test]
 fn test_html_unescaping() {
@@ -21,13 +21,21 @@ fn test_token_similarity() {
 async fn test_live_search_and_stream_resolution() {
     let client = JioSaavnClient::new();
     let song = client.find_best_match("Wavy", "Karan Aujla").await;
-    assert!(song.is_ok(), "Failed to find Wavy by Karan Aujla: {:?}", song.err());
+    assert!(
+        song.is_ok(),
+        "Failed to find Wavy by Karan Aujla: {:?}",
+        song.err()
+    );
 
     let song = song.unwrap();
     assert!(song.clean_title().to_lowercase().contains("wavy"));
 
     let stream = client.get_stream_url(&song).await;
-    assert!(stream.is_ok(), "Failed to resolve stream URL: {:?}", stream.err());
+    assert!(
+        stream.is_ok(),
+        "Failed to resolve stream URL: {:?}",
+        stream.err()
+    );
 
     let stream_info = stream.unwrap();
     assert!(stream_info.url.starts_with("http"));

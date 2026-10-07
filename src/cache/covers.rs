@@ -86,7 +86,11 @@ impl CoverCacheManager {
         Ok(Self {
             cache_dir,
             tmp_dir,
-            max_bytes: if max_bytes == 0 { DEFAULT_MAX_CACHE_BYTES } else { max_bytes },
+            max_bytes: if max_bytes == 0 {
+                DEFAULT_MAX_CACHE_BYTES
+            } else {
+                max_bytes
+            },
             in_flight: Mutex::new(HashSet::new()),
         })
     }
@@ -112,7 +116,9 @@ impl CoverCacheManager {
         let trimmed = key.trim();
         if !trimmed.is_empty()
             && trimmed.len() <= 64
-            && trimmed.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            && trimmed
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
         {
             trimmed.to_string()
         } else {
@@ -322,7 +328,11 @@ impl CoverCacheManager {
     }
 
     /// Prunes cache directory when it exceeds max_bytes, keeping newest files (LRU by mtime)
-    pub fn prune_cache_dir(cache_dir: &Path, tmp_dir: &Path, max_bytes: u64) -> Result<(), std::io::Error> {
+    pub fn prune_cache_dir(
+        cache_dir: &Path,
+        tmp_dir: &Path,
+        max_bytes: u64,
+    ) -> Result<(), std::io::Error> {
         let entries = match fs::read_dir(cache_dir) {
             Ok(e) => e,
             Err(_) => return Ok(()),
@@ -389,7 +399,10 @@ mod tests {
     #[test]
     fn test_sanitize_key() {
         assert_eq!(CoverCacheManager::sanitize_key("837534255"), "837534255");
-        assert_eq!(CoverCacheManager::sanitize_key("track_123-abc"), "track_123-abc");
+        assert_eq!(
+            CoverCacheManager::sanitize_key("track_123-abc"),
+            "track_123-abc"
+        );
 
         // Path traversal attempts must be hashed safely
         let unsafe_key = "../../etc/passwd";
@@ -401,8 +414,15 @@ mod tests {
 
     #[test]
     fn test_empty_and_dummy_zero_keys() {
-        let temp_dir = std::env::temp_dir().join(format!("shazam_key_test_{}", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
-        let manager = CoverCacheManager::new(temp_dir.clone(), 1000).expect("Failed to create manager");
+        let temp_dir = std::env::temp_dir().join(format!(
+            "shazam_key_test_{}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let manager =
+            CoverCacheManager::new(temp_dir.clone(), 1000).expect("Failed to create manager");
 
         // Blank and "0" must return None immediately
         assert!(manager.get_local_path("").is_none());
@@ -426,7 +446,10 @@ mod tests {
         // Apple modern dynamic template URLs
         let input_template = "https://is3-ssl.mzstatic.com/image/thumb/Music/{w}x{h}bb.jpg";
         let expected_template = "https://is3-ssl.mzstatic.com/image/thumb/Music/800x800bb.jpg";
-        assert_eq!(CoverCacheManager::optimize_apple_url(input_template), expected_template);
+        assert_eq!(
+            CoverCacheManager::optimize_apple_url(input_template),
+            expected_template
+        );
 
         // Non-Apple URLs must NOT be modified
         let non_apple = "https://example.com/images/400x400cc.jpg";
@@ -436,21 +459,38 @@ mod tests {
     #[test]
     fn test_validate_image_magic() {
         // Valid JPEG
-        assert!(CoverCacheManager::validate_image_magic(&[0xFF, 0xD8, 0xFF, 0xE0, 0x00]));
+        assert!(CoverCacheManager::validate_image_magic(&[
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00
+        ]));
         // Valid PNG
-        assert!(CoverCacheManager::validate_image_magic(&[0x89, b'P', b'N', b'G', 0x0D]));
+        assert!(CoverCacheManager::validate_image_magic(&[
+            0x89, b'P', b'N', b'G', 0x0D
+        ]));
         // Valid WEBP
-        assert!(CoverCacheManager::validate_image_magic(b"RIFF\x00\x00\x00\x00WEBPVP8 "));
+        assert!(CoverCacheManager::validate_image_magic(
+            b"RIFF\x00\x00\x00\x00WEBPVP8 "
+        ));
         // Invalid HTML or random text
-        assert!(!CoverCacheManager::validate_image_magic(b"<!DOCTYPE html><html>"));
-        assert!(!CoverCacheManager::validate_image_magic(b"{\"error\": \"not found\"}"));
+        assert!(!CoverCacheManager::validate_image_magic(
+            b"<!DOCTYPE html><html>"
+        ));
+        assert!(!CoverCacheManager::validate_image_magic(
+            b"{\"error\": \"not found\"}"
+        ));
         assert!(!CoverCacheManager::validate_image_magic(&[]));
     }
 
     #[test]
     fn test_cache_and_quota_eviction() {
-        let temp_dir = std::env::temp_dir().join(format!("hark_cache_test_{}", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
-        let manager = CoverCacheManager::new(temp_dir.clone(), 1000).expect("Failed to create manager");
+        let temp_dir = std::env::temp_dir().join(format!(
+            "hark_cache_test_{}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let manager =
+            CoverCacheManager::new(temp_dir.clone(), 1000).expect("Failed to create manager");
 
         // Write a mock valid JPEG (size: 400 bytes)
         let file1 = temp_dir.join("song1.jpg");
@@ -460,7 +500,10 @@ mod tests {
         drop(f1);
 
         assert!(manager.get_local_path("song1").is_some());
-        assert!(manager.get_local_uri("song1").unwrap().starts_with("file://"));
+        assert!(manager
+            .get_local_uri("song1")
+            .unwrap()
+            .starts_with("file://"));
 
         // Write a second mock JPEG (size: 400 bytes)
         let file2 = temp_dir.join("song2.jpg");

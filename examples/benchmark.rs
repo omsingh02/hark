@@ -1,9 +1,9 @@
-use std::time::{Duration, Instant};
 use hark::audio::resampler::AudioResampler;
 use hark::audio::silence::SilenceDetector;
 use hark::dsp::SignatureGenerator;
 use hark::history::HistoryStorage;
 use hark::network::models::RecognizedSong;
+use std::time::{Duration, Instant};
 
 fn format_duration(d: Duration) -> String {
     let micros = d.as_micros();
@@ -61,12 +61,22 @@ fn main() {
     let rtf_441 = test_seconds as f64 / avg_441.as_secs_f64();
 
     println!("  [44.1 kHz Stereo -> 16 kHz Mono (5.0s audio chunk)]");
-    println!("    * Output Samples:    {} (exact 16 kHz target)", out_len_441);
+    println!(
+        "    * Output Samples:    {} (exact 16 kHz target)",
+        out_len_441
+    );
     println!("    * Latency (Mean):    {}", format_duration(avg_441));
     println!("    * Latency (p50):     {}", format_duration(p50_441));
     println!("    * Latency (p95):     {}", format_duration(p95_441));
-    println!("    * DSP Throughput:    {:.2} MSamples/sec", throughput_441);
-    println!("    * Realtime Speedup:  {:.1}x real-time (5s audio converted in {})", rtf_441, format_duration(avg_441));
+    println!(
+        "    * DSP Throughput:    {:.2} MSamples/sec",
+        throughput_441
+    );
+    println!(
+        "    * Realtime Speedup:  {:.1}x real-time (5s audio converted in {})",
+        rtf_441,
+        format_duration(avg_441)
+    );
 
     let mut times_48 = Vec::with_capacity(iterations);
     for _ in 0..iterations {
@@ -106,12 +116,17 @@ fn main() {
     println!("    * Latency (Mean):    {}", format_duration(avg_sil));
     println!("    * Latency (p50):     {}", format_duration(p50_sil));
     println!("    * Latency (p95):     {}", format_duration(p95_sil));
-    println!("    * Gating Speed:      {:.2} MSamples/sec ({:.0}x real-time)\n", sil_throughput, sil_rtf);
+    println!(
+        "    * Gating Speed:      {:.2} MSamples/sec ({:.0}x real-time)\n",
+        sil_throughput, sil_rtf
+    );
 
     // ------------------------------------------------------------
     // 3. DSP Fingerprinting & Signature Generation
     // ------------------------------------------------------------
-    println!("--- 3. DSP Fingerprinting & Signature Generation (Native Rust FFT via hark-core) ---");
+    println!(
+        "--- 3. DSP Fingerprinting & Signature Generation (Native Rust FFT via hark-core) ---"
+    );
     let sig_gen = SignatureGenerator::new();
 
     let durations_test = [3, 5, 8, 12];
@@ -140,12 +155,20 @@ fn main() {
         if !sig_times.is_empty() {
             let (avg_sig, p50_sig, p95_sig, _) = stats(&mut sig_times);
             let rtf_sig = sec as f64 / avg_sig.as_secs_f64();
-            println!("  [{}s Audio Sample Chunk ({} samples)]", sec, samples.len());
+            println!(
+                "  [{}s Audio Sample Chunk ({} samples)]",
+                sec,
+                samples.len()
+            );
             println!("    * Signature Size:    {} bytes (Base64 URI)", sig_len);
             println!("    * Latency (Mean):    {}", format_duration(avg_sig));
             println!("    * Latency (p50):     {}", format_duration(p50_sig));
             println!("    * Latency (p95):     {}", format_duration(p95_sig));
-            println!("    * DSP Speedup:       {:.1}x real-time (fingerprinted in {})", rtf_sig, format_duration(avg_sig));
+            println!(
+                "    * DSP Speedup:       {:.1}x real-time (fingerprinted in {})",
+                rtf_sig,
+                format_duration(avg_sig)
+            );
         }
     }
     println!();
@@ -174,8 +197,16 @@ fn main() {
     let (avg_ext, _p50_ext, p95_ext, _) = stats(&mut extract_times);
 
     println!("  [Ring Buffer Operations (12s / 192,000 capacity)]");
-    println!("    * Push 512 Samples Latency:   Mean: {}, p95: {}", format_duration(avg_push), format_duration(p95_push));
-    println!("    * Extract 5s (80k samples):   Mean: {}, p95: {}", format_duration(avg_ext), format_duration(p95_ext));
+    println!(
+        "    * Push 512 Samples Latency:   Mean: {}, p95: {}",
+        format_duration(avg_push),
+        format_duration(p95_push)
+    );
+    println!(
+        "    * Extract 5s (80k samples):   Mean: {}, p95: {}",
+        format_duration(avg_ext),
+        format_duration(p95_ext)
+    );
     println!("    * Memory Overhead:            384.0 KB (Fixed contiguous ring)\n");
 
     // ------------------------------------------------------------
@@ -216,8 +247,16 @@ fn main() {
     let (avg_r, _p50_r, p95_r, _) = stats(&mut read_times);
 
     println!("  [History Persistence (Append-Only JSONL)]");
-    println!("    * Atomic Log Song Latency:    Mean: {}, p95: {}", format_duration(avg_w), format_duration(p95_w));
-    println!("    * Parse Last 50 Tracks:       Mean: {}, p95: {}\n", format_duration(avg_r), format_duration(p95_r));
+    println!(
+        "    * Atomic Log Song Latency:    Mean: {}, p95: {}",
+        format_duration(avg_w),
+        format_duration(p95_w)
+    );
+    println!(
+        "    * Parse Last 50 Tracks:       Mean: {}, p95: {}\n",
+        format_duration(avg_r),
+        format_duration(p95_r)
+    );
 
     println!("============================================================");
     println!("                  BENCHMARK RUN COMPLETED                   ");

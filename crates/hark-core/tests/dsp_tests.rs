@@ -1,6 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use crc32fast::Hasher;
-use hark_core::dsp::{DATA_URI_PREFIX, SignatureGenerator};
+use hark_core::dsp::{SignatureGenerator, DATA_URI_PREFIX};
 use hark_core::models::{RecognizedSong, ShazamResponse};
 use std::io::Cursor;
 
@@ -20,10 +20,14 @@ fn test_signature_generation_on_synthetic_sine_wave() {
         .collect();
 
     let mut gen = SignatureGenerator::new();
-    let uri = gen.generate_signature(&pcm).expect("Signature generation failed");
+    let uri = gen
+        .generate_signature(&pcm)
+        .expect("Signature generation failed");
 
     // Also test one-shot helper
-    let uri2 = gen.generate_from_i16(&pcm).expect("generate_from_i16 failed");
+    let uri2 = gen
+        .generate_from_i16(&pcm)
+        .expect("generate_from_i16 failed");
     assert_eq!(uri, uri2);
 
     // 1. Check URI prefix
@@ -34,7 +38,10 @@ fn test_signature_generation_on_synthetic_sine_wave() {
     let binary = base64::Engine::decode(&base64::prelude::BASE64_STANDARD, b64_payload)
         .expect("Valid Base64 payload");
 
-    assert!(binary.len() > 48, "Binary signature must have header > 48 bytes");
+    assert!(
+        binary.len() > 48,
+        "Binary signature must have header > 48 bytes"
+    );
 
     // 3. Verify magic bytes
     let mut cursor = Cursor::new(&binary);

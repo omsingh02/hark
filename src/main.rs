@@ -83,7 +83,10 @@ struct Cli {
     #[arg(long, help = "Download a song by title and artist directly from JioSaavn 320kbps", num_args = 2, value_names = ["TITLE", "ARTIST"])]
     download: Option<Vec<String>>,
 
-    #[arg(long, help = "Download the currently recognized song from running daemon")]
+    #[arg(
+        long,
+        help = "Download the currently recognized song from running daemon"
+    )]
     download_current: bool,
 
     #[arg(long, help = "Stream full-length track directly from JioSaavn via mpv", num_args = 2, value_names = ["TITLE", "ARTIST"])]
@@ -102,7 +105,11 @@ fn read_pid() -> Option<i32> {
             let cmdline_path = format!("/proc/{}/cmdline", pid);
             if let Ok(cmdline) = fs::read_to_string(&cmdline_path) {
                 let program = cmdline.split('\0').next().unwrap_or("");
-                if std::path::Path::new(program).file_name().and_then(|n| n.to_str()) == Some("hark") {
+                if std::path::Path::new(program)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    == Some("hark")
+                {
                     return Some(pid);
                 }
             }
@@ -150,7 +157,11 @@ fn emit_offline() {
 
 fn emit_ratelimited() {
     let _ = fs::write(state_file(), "ratelimited");
-    emit_waybar_state("󱎫", "hark: rate-limited by Shazam, backing off", "ratelimited");
+    emit_waybar_state(
+        "󱎫",
+        "hark: rate-limited by Shazam, backing off",
+        "ratelimited",
+    );
 }
 
 fn emit_found(song: &RecognizedSong) {
@@ -244,7 +255,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let download_dir = JioSaavnDownloader::get_music_dir();
 
         println!("Downloading: {} - {} (320kbps AAC)...", title, artist);
-        let song = client.find_best_match(title, artist).await.map_err(|e| { eprintln!("Search error: {}", e); std::process::exit(1); }).unwrap();
+        let song = client
+            .find_best_match(title, artist)
+            .await
+            .map_err(|e| {
+                eprintln!("Search error: {}", e);
+                std::process::exit(1);
+            })
+            .unwrap();
         match client.download_song(&song, &download_dir).await {
             Ok(p) => {
                 println!("Saved to: {}", p.display());
@@ -263,8 +281,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let client = JioSaavnDownloader::new();
             let download_dir = JioSaavnDownloader::get_music_dir();
 
-            println!("Downloading current track: {} - {} (320kbps AAC)...", title.trim(), artist.trim());
-            let song = client.find_best_match(title.trim(), artist.trim()).await.map_err(|e| { eprintln!("Search error: {}", e); std::process::exit(1); }).unwrap();
+            println!(
+                "Downloading current track: {} - {} (320kbps AAC)...",
+                title.trim(),
+                artist.trim()
+            );
+            let song = client
+                .find_best_match(title.trim(), artist.trim())
+                .await
+                .map_err(|e| {
+                    eprintln!("Search error: {}", e);
+                    std::process::exit(1);
+                })
+                .unwrap();
             match client.download_song(&song, &download_dir).await {
                 Ok(p) => {
                     println!("Saved to: {}", p.display());
@@ -285,7 +314,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let title = &args[0];
         let artist = &args[1];
         let client = JioSaavnDownloader::new();
-        let song = client.find_best_match(title, artist).await.map_err(|e| { eprintln!("Search error: {}", e); std::process::exit(1); }).unwrap();
+        let song = client
+            .find_best_match(title, artist)
+            .await
+            .map_err(|e| {
+                eprintln!("Search error: {}", e);
+                std::process::exit(1);
+            })
+            .unwrap();
         match client.get_stream_url(&song).await {
             Ok(info) => {
                 let status = std::process::Command::new("mpv")
@@ -348,7 +384,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Check single-instance
     if let Some(existing_pid) = read_pid() {
         if existing_pid != std::process::id() as i32 {
-            eprintln!("Another instance of hark is already running (PID {})", existing_pid);
+            eprintln!(
+                "Another instance of hark is already running (PID {})",
+                existing_pid
+            );
             std::process::exit(1);
         }
     }
@@ -372,9 +411,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let current_song = Arc::new(RwLock::new(None::<RecognizedSong>));
     let is_foreground = Arc::new(AtomicBool::new(false));
     let foreground_notify = Arc::new(tokio::sync::Notify::new());
-    let playback_anchor: Arc<RwLock<Option<(f64, std::time::Instant)>>> = Arc::new(RwLock::new(None));
+    let playback_anchor: Arc<RwLock<Option<(f64, std::time::Instant)>>> =
+        Arc::new(RwLock::new(None));
     let cover_cache = Arc::new(CoverCacheManager::default_manager()?);
-    let http_client = reqwest::Client::builder().timeout(Duration::from_secs(10)).build()?;
+    let http_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()?;
 
     // Register D-Bus MPRIS server
     let player_service = HarkPlayer::new(
@@ -403,10 +445,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             tokio::time::sleep(Duration::from_secs(4)).await;
             let recent = history_clone.get_recent(30);
             for item in recent {
-                let key = item.get("shazam_key").and_then(|v| v.as_str()).unwrap_or("").trim();
-                let url = item.get("cover_art").and_then(|v| v.as_str()).unwrap_or("").trim();
+                let key = item
+                    .get("shazam_key")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .trim();
+                let url = item
+                    .get("cover_art")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .trim();
                 let is_valid_url = url.starts_with("http://") || url.starts_with("https://");
-                if !key.is_empty() && key != "0" && is_valid_url && cache_clone.get_local_path(key).is_none() {
+                if !key.is_empty()
+                    && key != "0"
+                    && is_valid_url
+                    && cache_clone.get_local_path(key).is_none()
+                {
                     let _ = cache_clone.ensure_cached(&client_clone, url, key).await;
                     tokio::time::sleep(Duration::from_millis(400)).await;
                 }

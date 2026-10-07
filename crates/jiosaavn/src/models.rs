@@ -35,7 +35,9 @@ impl JioSaavnSong {
     }
 
     pub fn clean_artist(&self) -> String {
-        let raw = self.primary_artists.as_deref()
+        let raw = self
+            .primary_artists
+            .as_deref()
             .or(self.singers.as_deref())
             .unwrap_or("Unknown Artist");
         unescape_html(raw)
@@ -48,7 +50,7 @@ impl JioSaavnSong {
     pub fn high_res_cover_url(&self) -> Option<String> {
         self.image.as_ref().map(|u| {
             u.replace("150x150.jpg", "500x500.jpg")
-             .replace("50x50.jpg", "500x500.jpg")
+                .replace("50x50.jpg", "500x500.jpg")
         })
     }
 }

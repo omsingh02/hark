@@ -82,7 +82,9 @@ impl DecodedSignature {
             let mut fft_pass_number = 0;
 
             for frequency_peak in frequency_peaks {
-                let diff = frequency_peak.fft_pass_number.saturating_sub(fft_pass_number);
+                let diff = frequency_peak
+                    .fft_pass_number
+                    .saturating_sub(fft_pass_number);
 
                 if diff >= 255 {
                     peaks_cursor.write_u8(0xff)?;
