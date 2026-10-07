@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">hark logo</title>
+  <g>
+    <rect x="35" y="96" width="18" height="64" rx="9" fill="#5b7cfa"/>
+    <rect x="63" y="72" width="18" height="112" rx="9" fill="#5b7cfa"/>
+    <rect x="91" y="48" width="18" height="160" rx="9" fill="#5b7cfa"/>
+    <rect x="119" y="24" width="18" height="208" rx="9" fill="#18b5a5"/>
+    <rect x="147" y="64" width="18" height="128" rx="9" fill="#5b7cfa"/>
+    <rect x="175" y="84" width="18" height="88" rx="9" fill="#5b7cfa"/>
+    <rect x="203" y="104" width="18" height="48" rx="9" fill="#5b7cfa"/>
+  </g>
+</svg>
