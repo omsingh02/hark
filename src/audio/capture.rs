@@ -130,6 +130,13 @@ impl AudioCapture {
         shutdown: Arc<AtomicBool>,
     ) {
         while !shutdown.load(Ordering::Relaxed) {
+            // Wait until we are supposed to be running before opening any stream.
+            // This ensures the hardware mic is fully released when paused.
+            if !is_running.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(100));
+                continue;
+            }
+
             let host = cpal::default_host();
             let device = match Self::select_device(&host, mode) {
                 Some(d) => d,
@@ -159,18 +166,13 @@ impl AudioCapture {
             };
 
             let ring_clone = ring_buffer.clone();
-            let running_clone = is_running.clone();
 
             let stream_result = match config.sample_format() {
                 cpal::SampleFormat::F32 => {
                     let ring = ring_clone.clone();
-                    let running = running_clone.clone();
                     device.build_input_stream(
                         &config.into(),
                         move |data: &[f32], _| {
-                            if !running.load(Ordering::Relaxed) {
-                                return;
-                            }
                             let pcm16 = AudioResampler::resample_to_16k_mono(data, channels, sample_rate);
                             if let Ok(mut lock) = ring.lock() {
                                 lock.push_slice(&pcm16);
@@ -182,13 +184,9 @@ impl AudioCapture {
                 }
                 cpal::SampleFormat::I16 => {
                     let ring = ring_clone.clone();
-                    let running = running_clone.clone();
                     device.build_input_stream(
                         &config.into(),
                         move |data: &[i16], _| {
-                            if !running.load(Ordering::Relaxed) {
-                                return;
-                            }
                             let f32_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
                             let pcm16 = AudioResampler::resample_to_16k_mono(&f32_data, channels, sample_rate);
                             if let Ok(mut lock) = ring.lock() {
@@ -220,11 +218,15 @@ impl AudioCapture {
                 continue;
             }
 
-            // Stream actively captures until shutdown or device change occurs
-            while !shutdown.load(Ordering::Relaxed) && !device_changed.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(200));
+            // Stream actively captures until shutdown, device change, or pause
+            while !shutdown.load(Ordering::Relaxed)
+                && !device_changed.load(Ordering::Relaxed)
+                && is_running.load(Ordering::Relaxed)
+            {
+                std::thread::sleep(Duration::from_millis(100));
             }
 
+            // Drop the stream to fully release the hardware mic
             drop(stream);
 
             if device_changed.load(Ordering::Relaxed) {
@@ -243,18 +245,18 @@ impl AudioCapture {
     }
 
     pub fn extract_chunk(&self, duration_secs: usize) -> Vec<i16> {
-        let lock = self.ring_buffer.lock().unwrap();
+        let lock = self.ring_buffer.lock().unwrap_or_else(|e| e.into_inner());
         let samples_wanted = duration_secs * SAMPLE_RATE;
         lock.extract_recent(samples_wanted)
     }
 
     pub fn sample_count(&self) -> usize {
-        let lock = self.ring_buffer.lock().unwrap();
+        let lock = self.ring_buffer.lock().unwrap_or_else(|e| e.into_inner());
         lock.count()
     }
 
     pub fn clear_buffer(&self) {
-        let mut lock = self.ring_buffer.lock().unwrap();
+        let mut lock = self.ring_buffer.lock().unwrap_or_else(|e| e.into_inner());
         lock.clear();
     }
 }
