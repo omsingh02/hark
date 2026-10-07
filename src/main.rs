@@ -1,6 +1,5 @@
 mod audio;
 mod cache;
-mod downloader;
 mod dsp;
 mod history;
 mod mpris;
@@ -18,7 +17,6 @@ use zbus::connection::Builder;
 
 use crate::audio::{AudioCapture, AudioSourceMode, SilenceDetector};
 use crate::cache::CoverCacheManager;
-use crate::downloader::JioSaavnDownloader;
 use crate::dsp::SignatureGenerator;
 use crate::history::{extract_base_title, extract_lead_artist, HistoryStorage};
 use crate::mpris::{HarkPlayer, HarkRoot};
@@ -79,21 +77,6 @@ struct Cli {
         value_parser = ["auto", "mic", "monitor"]
     )]
     source: String,
-
-    #[arg(long, help = "Download a song by title and artist directly from JioSaavn 320kbps", num_args = 2, value_names = ["TITLE", "ARTIST"])]
-    download: Option<Vec<String>>,
-
-    #[arg(
-        long,
-        help = "Download the currently recognized song from running daemon"
-    )]
-    download_current: bool,
-
-    #[arg(long, help = "Stream full-length track directly from JioSaavn via mpv", num_args = 2, value_names = ["TITLE", "ARTIST"])]
-    stream: Option<Vec<String>>,
-
-    #[arg(long, help = "Play full track via system player (mpv) with complete MPRIS metadata and controls", num_args = 2, value_names = ["TITLE", "ARTIST"])]
-    play: Option<Vec<String>>,
 }
 
 fn read_pid() -> Option<i32> {
@@ -247,120 +230,6 @@ fn is_continuous_or_variant(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
-
-    if let Some(args) = cli.download {
-        let title = &args[0];
-        let artist = &args[1];
-        let client = JioSaavnDownloader::new();
-        let download_dir = JioSaavnDownloader::get_music_dir();
-
-        println!("Downloading: {} - {} (320kbps AAC)...", title, artist);
-        let song = client
-            .find_best_match(title, artist)
-            .await
-            .map_err(|e| {
-                eprintln!("Search error: {}", e);
-                std::process::exit(1);
-            })
-            .unwrap();
-        match client.download_song(&song, &download_dir).await {
-            Ok(p) => {
-                println!("Saved to: {}", p.display());
-                return Ok(());
-            }
-            Err(e) => {
-                eprintln!("Download error: {}", e);
-                std::process::exit(1);
-            }
-        }
-    }
-
-    if cli.download_current {
-        let current_text = fs::read_to_string(current_file()).unwrap_or_default();
-        if let Some((title, artist)) = current_text.split_once(" - ") {
-            let client = JioSaavnDownloader::new();
-            let download_dir = JioSaavnDownloader::get_music_dir();
-
-            println!(
-                "Downloading current track: {} - {} (320kbps AAC)...",
-                title.trim(),
-                artist.trim()
-            );
-            let song = client
-                .find_best_match(title.trim(), artist.trim())
-                .await
-                .map_err(|e| {
-                    eprintln!("Search error: {}", e);
-                    std::process::exit(1);
-                })
-                .unwrap();
-            match client.download_song(&song, &download_dir).await {
-                Ok(p) => {
-                    println!("Saved to: {}", p.display());
-                    return Ok(());
-                }
-                Err(e) => {
-                    eprintln!("Download error: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        } else {
-            eprintln!("No song is currently recognized.");
-            std::process::exit(1);
-        }
-    }
-
-    if let Some(args) = cli.stream {
-        let title = &args[0];
-        let artist = &args[1];
-        let client = JioSaavnDownloader::new();
-        let song = client
-            .find_best_match(title, artist)
-            .await
-            .map_err(|e| {
-                eprintln!("Search error: {}", e);
-                std::process::exit(1);
-            })
-            .unwrap();
-        match client.get_stream_url(&song).await {
-            Ok(info) => {
-                let status = std::process::Command::new("mpv")
-                    .arg("--no-video")
-                    .arg("--volume=85")
-                    .arg(&info.url)
-                    .status();
-                if let Ok(s) = status {
-                    std::process::exit(s.code().unwrap_or(0));
-                }
-            }
-            Err(e) => {
-                eprintln!("Streaming error: {}", e);
-                std::process::exit(1);
-            }
-        }
-        return Ok(());
-    }
-
-    if let Some(args) = cli.play {
-        let title = &args[0];
-        let artist = &args[1];
-        let client = JioSaavnDownloader::new();
-        let download_dir = JioSaavnDownloader::get_music_dir();
-
-        match client.ensure_song(title, artist, &download_dir).await {
-            Ok(path) => {
-                match client.play_in_default_player(&path).await {
-                    Ok(msg) => println!("{}", msg),
-                    Err(e) => eprintln!("Playback error: {}", e),
-                }
-                return Ok(());
-            }
-            Err(e) => {
-                eprintln!("Playback preparation error: {}", e);
-                std::process::exit(1);
-            }
-        }
-    }
 
     if cli.toggle {
         if let Some(pid) = read_pid() {

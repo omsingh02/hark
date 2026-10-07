@@ -231,7 +231,6 @@ cargo run --example test_capture   # live capture and API check (sends a fingerp
 | --- | --- |
 | `src/` | The daemon: audio capture, MPRIS service, history, cover-art cache, Shazam client |
 | `crates/hark-core` | Landmark fingerprinting and Shazam response models |
-| `crates/jiosaavn` | Optional helper for fetching full tracks; not used for recognition |
 | `contrib/` | systemd unit, Waybar and Hyprland examples |
 | `examples/` | Benchmark and live capture check |
 

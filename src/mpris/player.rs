@@ -6,7 +6,6 @@ use zbus::interface;
 use zbus::zvariant::Value;
 
 use crate::cache::CoverCacheManager;
-use crate::downloader::JioSaavnClient;
 use crate::history::HistoryStorage;
 use crate::network::models::RecognizedSong;
 
@@ -52,7 +51,6 @@ pub struct HarkPlayer {
     is_listening: Arc<AtomicBool>,
     engine_status: Arc<RwLock<String>>,
     current_song: Arc<RwLock<Option<RecognizedSong>>>,
-    downloader: Arc<JioSaavnClient>,
     is_foreground: Arc<AtomicBool>,
     foreground_notify: Arc<tokio::sync::Notify>,
     playback_anchor: Arc<RwLock<Option<(f64, std::time::Instant)>>>,
@@ -77,7 +75,6 @@ impl HarkPlayer {
             is_listening,
             engine_status,
             current_song,
-            downloader: Arc::new(JioSaavnClient::new()),
             is_foreground,
             foreground_notify,
             playback_anchor,
@@ -278,51 +275,6 @@ impl HarkPlayer {
             unsafe {
                 libc::kill(libc::getpid(), libc::SIGUSR1);
             }
-        }
-    }
-
-    async fn download_current(&self) -> String {
-        let (title, artist) = {
-            let guard = self.current_song.read().await;
-            match guard.as_ref() {
-                Some(s) => (s.title.clone(), s.artist.clone()),
-                None => return "Error: No song currently recognized".to_string(),
-            }
-        };
-
-        let download_dir = JioSaavnClient::get_music_dir();
-
-        let song = match self.downloader.find_best_match(&title, &artist).await {
-            Ok(s) => s,
-            Err(e) => return format!("Error: {}", e),
-        };
-        match self.downloader.download_song(&song, &download_dir).await {
-            Ok(p) => format!("Success: Downloaded to {}", p.display()),
-            Err(e) => format!("Error: {}", e),
-        }
-    }
-
-    async fn download_track(&self, title: String, artist: String) -> String {
-        let download_dir = JioSaavnClient::get_music_dir();
-
-        let song = match self.downloader.find_best_match(&title, &artist).await {
-            Ok(s) => s,
-            Err(e) => return format!("Error: {}", e),
-        };
-        match self.downloader.download_song(&song, &download_dir).await {
-            Ok(p) => format!("Success: Downloaded to {}", p.display()),
-            Err(e) => format!("Error: {}", e),
-        }
-    }
-
-    async fn get_stream_url(&self, title: String, artist: String) -> String {
-        let song = match self.downloader.find_best_match(&title, &artist).await {
-            Ok(s) => s,
-            Err(_) => return String::new(),
-        };
-        match self.downloader.get_stream_url(&song).await {
-            Ok(info) => info.url,
-            Err(_) => String::new(),
         }
     }
 

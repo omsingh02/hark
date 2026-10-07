@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The `GetPreviewUrl` D-Bus method and the `shazam:previewUrl` metadata key.
+- The `--download`, `--download-current`, `--stream` and `--play` options, the `DownloadCurrent`, `DownloadTrack` and `GetStreamUrl` D-Bus methods, and the `jiosaavn` crate. hark only recognizes music; fetching full tracks is out of scope.
 
 ### Fixed
 
@@ -51,4 +52,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Scripts that read `$XDG_RUNTIME_DIR/shazam-daemon/...` should read `$XDG_RUNTIME_DIR/hark/...` with the new file names listed above, or use `contrib/waybar/hark-waybar`.
    - Replace the old Waybar module with the one in `contrib/waybar/` (module `custom/hark`, CSS id `#custom-hark`).
    - Any list that ignores or filters the player name "Shazam" needs to use "hark".
+   - Anything that used `--download-current`, `--stream`, `--play` or the download D-Bus methods needs another tool, because hark no longer includes them.
 4. History is carried over automatically on the first start. Once everything works you can delete the old `shazam_history.*` files.
