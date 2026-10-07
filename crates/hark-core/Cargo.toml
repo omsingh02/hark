@@ -1,9 +1,12 @@
 [package]
-name = "shazam-core"
+name = "hark-core"
 version = "0.1.0"
 edition = "2021"
-description = "Pure DSP landmark audio fingerprinting and domain models for Shazam recognition"
+rust-version = "1.88"
+description = "Landmark audio fingerprinting and Shazam response models for hark"
 license = "GPL-3.0-or-later"
+repository = "https://github.com/omsingh02/hark"
+publish = false
 
 [dependencies]
 realfft = "3.4"

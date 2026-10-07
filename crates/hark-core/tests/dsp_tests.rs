@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use crc32fast::Hasher;
-use shazam_core::dsp::{DATA_URI_PREFIX, SignatureGenerator};
-use shazam_core::models::{RecognizedSong, ShazamResponse};
+use hark_core::dsp::{DATA_URI_PREFIX, SignatureGenerator};
+use hark_core::models::{RecognizedSong, ShazamResponse};
 use std::io::Cursor;
 
 #[test]

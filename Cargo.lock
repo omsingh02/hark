@@ -728,6 +728,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
+name = "hark"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "byteorder",
+ "chrono",
+ "clap",
+ "cpal",
+ "crc32fast",
+ "dirs",
+ "hark-core",
+ "jiosaavn",
+ "libc",
+ "mp4ameta",
+ "rand 0.8.8",
+ "reqwest",
+ "rtrb",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "zbus",
+]
+
+[[package]]
+name = "hark-core"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "byteorder",
+ "crc32fast",
+ "realfft",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1866,45 +1905,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "shazam-core"
-version = "0.1.0"
-dependencies = [
- "base64",
- "byteorder",
- "crc32fast",
- "realfft",
- "rustfft",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "shazam-daemon"
-version = "0.1.0"
-dependencies = [
- "base64",
- "byteorder",
- "chrono",
- "clap",
- "cpal",
- "crc32fast",
- "dirs",
- "jiosaavn",
- "libc",
- "mp4ameta",
- "rand 0.8.8",
- "reqwest",
- "rtrb",
- "serde",
- "serde_json",
- "shazam-core",
- "tokio",
- "uuid",
- "zbus",
 ]
 
 [[package]]

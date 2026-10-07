@@ -1,36 +1,35 @@
 [workspace]
 members = [
     ".",
+    "crates/hark-core",
     "crates/jiosaavn",
-    "crates/shazam-core",
 ]
 
 [package]
-name = "shazam-daemon"
+name = "hark"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.88"
+description = "Always-on song recognition for Linux, exposed as an MPRIS2 media player"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/omsingh02/shazam-daemon"
+repository = "https://github.com/omsingh02/hark"
+homepage = "https://github.com/omsingh02/hark"
+readme = "README.md"
+keywords = ["music", "audio", "mpris", "dbus", "daemon"]
+categories = ["multimedia::audio", "command-line-utilities"]
+publish = false
 
 [lib]
-name = "shazam_daemon"
+name = "hark"
 path = "src/lib.rs"
 
 [[bin]]
-name = "shazam-daemon"
+name = "hark"
 path = "src/main.rs"
 
-[[bin]]
-name = "test_capture"
-path = "src/bin/test_capture.rs"
-
-[[bin]]
-name = "benchmark"
-path = "src/bin/benchmark.rs"
-
 [dependencies]
-# Pure DSP, Landmark Fingerprinting & Domain Models (Modular Standalone Crate)
-shazam-core = { path = "crates/shazam-core" }
+# Landmark fingerprinting and Shazam response models
+hark-core = { path = "crates/hark-core" }
 
 # Audio capture and lock-free buffers
 cpal = "0.15"

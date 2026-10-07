@@ -10,10 +10,10 @@ use crate::downloader::JioSaavnClient;
 use crate::history::HistoryStorage;
 use crate::network::models::RecognizedSong;
 
-pub struct ShazamRoot;
+pub struct HarkRoot;
 
 #[interface(name = "org.mpris.MediaPlayer2")]
-impl ShazamRoot {
+impl HarkRoot {
     #[zbus(property)]
     async fn can_quit(&self) -> bool {
         false
@@ -31,7 +31,7 @@ impl ShazamRoot {
 
     #[zbus(property)]
     async fn identity(&self) -> String {
-        "Shazam".to_string()
+        "Hark".to_string()
     }
 
     #[zbus(property)]
@@ -48,7 +48,7 @@ impl ShazamRoot {
     async fn quit(&self) {}
 }
 
-pub struct ShazamPlayer {
+pub struct HarkPlayer {
     is_listening: Arc<AtomicBool>,
     engine_status: Arc<RwLock<String>>,
     current_song: Arc<RwLock<Option<RecognizedSong>>>,
@@ -60,7 +60,7 @@ pub struct ShazamPlayer {
     cover_cache: Arc<CoverCacheManager>,
 }
 
-impl ShazamPlayer {
+impl HarkPlayer {
     pub fn new(
         is_listening: Arc<AtomicBool>,
         engine_status: Arc<RwLock<String>>,
@@ -100,7 +100,7 @@ impl ShazamPlayer {
 }
 
 #[interface(name = "org.mpris.MediaPlayer2.Player")]
-impl ShazamPlayer {
+impl HarkPlayer {
     #[zbus(property)]
     async fn playback_status(&self) -> String {
         if self.is_listening.load(Ordering::Relaxed) {
@@ -167,7 +167,7 @@ impl ShazamPlayer {
                 song.shazam_key.as_deref().filter(|k| !k.is_empty() && *k != "0").unwrap_or("active")
             );
             map.insert("mpris:trackid".into(), Value::from(track_id));
-            map.insert("shazam:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
+            map.insert("hark:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
             map.insert("xesam:title".into(), Value::from(song.title.clone()));
             map.insert("xesam:artist".into(), Value::from(vec![song.artist.clone()]));
 
@@ -191,7 +191,7 @@ impl ShazamPlayer {
                 map.insert("xesam:artUrl".into(), Value::from(art));
             }
             if let Some(isrc) = &song.isrc {
-                map.insert("shazam:isrc".into(), Value::from(isrc.clone()));
+                map.insert("hark:isrc".into(), Value::from(isrc.clone()));
             }
             let anchor_guard = self.playback_anchor.read().await;
             let current_offset = if let Some((offset_sec, instant)) = *anchor_guard {
@@ -199,18 +199,18 @@ impl ShazamPlayer {
             } else {
                 song.offset_seconds.unwrap_or(0.0)
             };
-            map.insert("shazam:offset".into(), Value::from(current_offset));
+            map.insert("hark:offset".into(), Value::from(current_offset));
             if let Some(yt) = &song.youtube_url {
-                map.insert("shazam:youtubeUrl".into(), Value::from(yt.clone()));
+                map.insert("hark:youtubeUrl".into(), Value::from(yt.clone()));
             }
             if let Some(share) = &song.share_url {
-                map.insert("shazam:shareUrl".into(), Value::from(share.clone()));
+                map.insert("hark:shareUrl".into(), Value::from(share.clone()));
             }
             if let Some(lyrics) = &song.lyrics {
-                map.insert("shazam:lyrics".into(), Value::from(lyrics.join("\n")));
+                map.insert("hark:lyrics".into(), Value::from(lyrics.join("\n")));
             }
         } else {
-            map.insert("shazam:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
+            map.insert("hark:engineStatus".into(), Value::from(self.engine_status.read().await.clone()));
             map.insert(
                 "mpris:trackid".into(),
                 Value::from("/org/mpris/MediaPlayer2/Track/none".to_string()),

@@ -17,6 +17,7 @@ fn test_token_similarity() {
 }
 
 #[tokio::test]
+#[ignore = "queries the live JioSaavn API; run with `cargo test -- --ignored`"]
 async fn test_live_search_and_stream_resolution() {
     let client = JioSaavnClient::new();
     let song = client.find_best_match("Wavy", "Karan Aujla").await;

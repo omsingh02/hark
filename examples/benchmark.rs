@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
-use shazam_daemon::audio::resampler::AudioResampler;
-use shazam_daemon::audio::silence::SilenceDetector;
-use shazam_daemon::dsp::SignatureGenerator;
-use shazam_daemon::history::HistoryStorage;
-use shazam_daemon::network::models::RecognizedSong;
+use hark::audio::resampler::AudioResampler;
+use hark::audio::silence::SilenceDetector;
+use hark::dsp::SignatureGenerator;
+use hark::history::HistoryStorage;
+use hark::network::models::RecognizedSong;
 
 fn format_duration(d: Duration) -> String {
     let micros = d.as_micros();
@@ -28,7 +28,7 @@ fn stats(durations: &mut [Duration]) -> (Duration, Duration, Duration, Duration)
 
 fn main() {
     println!("============================================================");
-    println!("     SHAZAM-DAEMON INTERNAL SOFTWARE FEATURE BENCHMARKS     ");
+    println!("            HARK INTERNAL FEATURE BENCHMARKS            ");
     println!("============================================================\n");
 
     // ------------------------------------------------------------
@@ -111,7 +111,7 @@ fn main() {
     // ------------------------------------------------------------
     // 3. DSP Fingerprinting & Signature Generation
     // ------------------------------------------------------------
-    println!("--- 3. DSP Fingerprinting & Signature Generation (Native Rust FFT via shazam-core) ---");
+    println!("--- 3. DSP Fingerprinting & Signature Generation (Native Rust FFT via hark-core) ---");
     let sig_gen = SignatureGenerator::new();
 
     let durations_test = [3, 5, 8, 12];
@@ -154,7 +154,7 @@ fn main() {
     // 4. Ring Buffer Operations (Lock-Free Memory Management)
     // ------------------------------------------------------------
     println!("--- 4. Ring Buffer (Sample Storage & Window Extraction) ---");
-    let mut ring = shazam_daemon::audio::RingBuffer::new();
+    let mut ring = hark::audio::RingBuffer::new();
     let chunk_512: Vec<i16> = vec![1234; 512];
     let mut push_times = Vec::with_capacity(1000);
 

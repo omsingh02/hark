@@ -89,7 +89,7 @@ impl AudioCapture {
         let shutdown_clone = shutdown.clone();
 
         std::thread::Builder::new()
-            .name("shazam-audio-capture".into())
+            .name("hark-audio-capture".into())
             .spawn(move || {
                 Self::capture_loop(mode, is_running_clone, ring_buffer_clone, shutdown_clone);
             })?;

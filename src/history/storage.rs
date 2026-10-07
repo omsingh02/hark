@@ -1,6 +1,6 @@
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::network::models::RecognizedSong;
 
@@ -11,11 +11,26 @@ pub struct HistoryStorage {
 
 impl HistoryStorage {
     pub fn new() -> Self {
-        let base_dir = dirs_or_fallback();
-        let txt_path = base_dir.join("shazam_history.txt");
-        let jsonl_path = base_dir.join("shazam_history.jsonl");
+        Self::open(&dirs_or_fallback())
+    }
 
-        let _ = create_dir_all(&base_dir);
+    /// Opens the history stored under `<data_dir>/hark`, creating it if needed.
+    ///
+    /// On the very first run, a history written by shazam-daemon (`<data_dir>/shazam_history.*`)
+    /// is copied in; the original files are left untouched. Later runs never import again, so
+    /// clearing the history stays cleared.
+    fn open(data_dir: &Path) -> Self {
+        let dir = data_dir.join("hark");
+        let first_run = !dir.exists();
+        let _ = create_dir_all(&dir);
+
+        let txt_path = dir.join("history.txt");
+        let jsonl_path = dir.join("history.jsonl");
+
+        if first_run {
+            Self::import_legacy(&data_dir.join("shazam_history.txt"), &txt_path);
+            Self::import_legacy(&data_dir.join("shazam_history.jsonl"), &jsonl_path);
+        }
 
         let storage = Self {
             txt_path,
@@ -26,6 +41,12 @@ impl HistoryStorage {
         storage.compact_history();
 
         storage
+    }
+
+    fn import_legacy(legacy: &Path, target: &Path) {
+        if !target.exists() && legacy.is_file() {
+            let _ = std::fs::copy(legacy, target);
+        }
     }
 
     /// Checks if a stored JSON record matches a RecognizedSong instance
@@ -393,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_delete_entry() {
-        let temp_dir = std::env::temp_dir().join(format!("shazam_test_{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("hark_test_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&temp_dir);
         let storage = HistoryStorage {
             txt_path: temp_dir.join("test_history.txt"),
@@ -448,5 +469,55 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
-}
 
+    fn scratch_data_dir(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("hark_{}_{}_{}", tag, std::process::id(), nanos));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_open_stores_history_under_hark_dir() {
+        let data = scratch_data_dir("layout");
+        let storage = HistoryStorage::open(&data);
+        assert_eq!(storage.jsonl_path, data.join("hark").join("history.jsonl"));
+        assert_eq!(storage.txt_path, data.join("hark").join("history.txt"));
+        let _ = std::fs::remove_dir_all(data);
+    }
+
+    #[test]
+    fn test_first_run_copies_legacy_history_and_keeps_original() {
+        let data = scratch_data_dir("legacy");
+        let line = r#"{"timestamp":"2026-01-01 00:00:00","title":"Old Song","artist":"Old Artist","album":"","genre":"","isrc":"","shazam_key":"42","cover_art":"","offset":0.0,"preview_url":"","youtube_url":"","share_url":"","lyrics":[]}"#;
+        std::fs::write(data.join("shazam_history.jsonl"), format!("{line}\n")).unwrap();
+        std::fs::write(data.join("shazam_history.txt"), "[2026-01-01 00:00:00] Old Artist - Old Song\n").unwrap();
+
+        let storage = HistoryStorage::open(&data);
+        let recent = storage.get_recent(10);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0]["title"], "Old Song");
+        assert!(data.join("shazam_history.jsonl").exists(), "legacy file must be left in place");
+
+        let _ = std::fs::remove_dir_all(data);
+    }
+
+    #[test]
+    fn test_legacy_history_is_not_imported_again_after_clear() {
+        let data = scratch_data_dir("noreimport");
+        let line = r#"{"timestamp":"2026-01-01 00:00:00","title":"Old Song","artist":"Old Artist","album":"","genre":"","isrc":"","shazam_key":"42","cover_art":"","offset":0.0,"preview_url":"","youtube_url":"","share_url":"","lyrics":[]}"#;
+        std::fs::write(data.join("shazam_history.jsonl"), format!("{line}\n")).unwrap();
+
+        let storage = HistoryStorage::open(&data);
+        assert_eq!(storage.get_recent(10).len(), 1);
+        storage.clear();
+
+        let reopened = HistoryStorage::open(&data);
+        assert!(reopened.get_recent(10).is_empty());
+
+        let _ = std::fs::remove_dir_all(data);
+    }
+}

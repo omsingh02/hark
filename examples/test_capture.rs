@@ -2,12 +2,12 @@ use std::time::Duration;
 use reqwest::Client;
 use serde_json::json;
 use uuid::Uuid;
-use shazam_daemon::audio::{AudioCapture, AudioSourceMode, SilenceDetector};
-use shazam_daemon::dsp::SignatureGenerator;
+use hark::audio::{AudioCapture, AudioSourceMode, SilenceDetector};
+use hark::dsp::SignatureGenerator;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!("=== Testing Shazam Live Capture & Raw API ===");
+    println!("=== hark live capture and Shazam API check ===");
     let capture = AudioCapture::new(AudioSourceMode::Auto)?;
     let silence = SilenceDetector::default();
     let sig_gen = SignatureGenerator::new();

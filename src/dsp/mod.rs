@@ -1,3 +1,3 @@
-//! DSP and landmark audio fingerprinting re-exported from `shazam-core`.
+//! DSP and landmark audio fingerprinting re-exported from `hark-core`.
 
-pub use shazam_core::dsp::*;
+pub use hark_core::dsp::*;

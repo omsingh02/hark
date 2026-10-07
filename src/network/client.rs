@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use super::models::{RecognizedSong, ShazamResponse};
 
-pub const AUDILE_USER_AGENTS: &[&str] = &[
+pub const ANDROID_USER_AGENTS: &[&str] = &[
     "Dalvik/2.1.0 (Linux; U; Android 5.0.2; VS980 4G Build/LRX22G)",
     "Dalvik/1.6.0 (Linux; U; Android 4.4.2; SM-T210 Build/KOT49H)",
     "Dalvik/2.1.0 (Linux; U; Android 5.1.1; SM-P905V Build/LMY47X)",
@@ -149,7 +149,7 @@ impl ShazamClient {
     ) -> Result<Option<RecognizedSong>, Box<dyn std::error::Error + Send + Sync>> {
         let mut rng = rand::thread_rng();
 
-        let ua = AUDILE_USER_AGENTS.choose(&mut rng).unwrap_or(&AUDILE_USER_AGENTS[0]);
+        let ua = ANDROID_USER_AGENTS.choose(&mut rng).unwrap_or(&ANDROID_USER_AGENTS[0]);
         let loc = LOCATIONS.choose(&mut rng).unwrap_or(&LOCATIONS[0]);
 
         let now_sec = chrono::Utc::now().timestamp();

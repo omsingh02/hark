@@ -21,50 +21,63 @@ use crate::cache::CoverCacheManager;
 use crate::downloader::JioSaavnDownloader;
 use crate::dsp::SignatureGenerator;
 use crate::history::{extract_base_title, extract_lead_artist, HistoryStorage};
-use crate::mpris::{ShazamPlayer, ShazamRoot};
+use crate::mpris::{HarkPlayer, HarkRoot};
 use crate::network::{RecognizedSong, ShazamClient};
 
-/// Resolves the standard Freedesktop runtime directory: $XDG_RUNTIME_DIR/shazam-daemon (Rule H-2)
+/// Resolves the standard Freedesktop runtime directory: $XDG_RUNTIME_DIR/hark (Rule H-2)
 fn runtime_dir() -> std::path::PathBuf {
     let dir = dirs::runtime_dir()
         .unwrap_or_else(|| {
             let base = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
             std::path::PathBuf::from(base)
         })
-        .join("shazam-daemon");
+        .join("hark");
     let _ = fs::create_dir_all(&dir);
     dir
 }
 
 fn pid_file() -> std::path::PathBuf {
-    runtime_dir().join("shazam-scanner.pid")
+    runtime_dir().join("hark.pid")
 }
 
 fn state_file() -> std::path::PathBuf {
-    runtime_dir().join("waybar-shazam-state")
+    runtime_dir().join("state")
 }
 
 fn current_file() -> std::path::PathBuf {
-    runtime_dir().join("waybar-shazam-current")
+    runtime_dir().join("current")
 }
 
 fn json_file() -> std::path::PathBuf {
-    runtime_dir().join("waybar-shazam-json")
+    runtime_dir().join("waybar.json")
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "shazam-daemon", about = "High-performance Shazam audio recognition daemon and 320kbps downloader")]
+#[command(
+    name = "hark",
+    version,
+    about = "Always-on song recognition for Linux, exposed as an MPRIS2 media player",
+    after_help = "With no options, hark starts the daemon and keeps running in the foreground.\n\
+                  Control a running daemon with --toggle and --status, or over D-Bus\n\
+                  (org.mpris.MediaPlayer2.hark), for example: playerctl -p hark metadata"
+)]
 struct Cli {
-    #[arg(long, help = "Run as background daemon with JSON output for Waybar / Quickshell")]
+    /// Deprecated no-op, kept so existing service files keep working
+    #[arg(long, hide = true)]
     waybar: bool,
 
-    #[arg(long, help = "Toggle listening state of running daemon")]
+    #[arg(long, help = "Pause or resume listening on the running daemon")]
     toggle: bool,
 
-    #[arg(long, help = "Print running daemon status")]
+    #[arg(long, help = "Print whether the daemon is running, as JSON")]
     status: bool,
 
-    #[arg(long, help = "Audio capture source: auto, monitor, or mic", default_value = "auto")]
+    #[arg(
+        long,
+        help = "Audio input to listen to: auto and mic use the default input device, monitor prefers an input named \"monitor\"",
+        default_value = "auto",
+        value_parser = ["auto", "mic", "monitor"]
+    )]
     source: String,
 
     #[arg(long, help = "Download a song by title and artist directly from JioSaavn 320kbps", num_args = 2, value_names = ["TITLE", "ARTIST"])]
@@ -85,10 +98,11 @@ fn read_pid() -> Option<i32> {
     if path.exists() {
         let content = fs::read_to_string(&path).ok()?;
         if let Ok(pid) = content.trim().parse::<i32>() {
-            // Rule U-3: Verify process name via /proc/<pid>/cmdline
+            // Rule U-3: Verify the process is hark by the program name in /proc/<pid>/cmdline
             let cmdline_path = format!("/proc/{}/cmdline", pid);
             if let Ok(cmdline) = fs::read_to_string(&cmdline_path) {
-                if cmdline.contains("shazam-daemon") {
+                let program = cmdline.split('\0').next().unwrap_or("");
+                if std::path::Path::new(program).file_name().and_then(|n| n.to_str()) == Some("hark") {
                     return Some(pid);
                 }
             }
@@ -121,22 +135,22 @@ fn emit_waybar_state(text: &str, tooltip: &str, class: &str) {
 fn emit_paused() {
     let _ = fs::write(state_file(), "paused");
     let _ = fs::remove_file(current_file());
-    emit_waybar_state("󰏤", "Shazam is paused. Click to listen.", "paused");
+    emit_waybar_state("󰏤", "hark is paused. Click to listen.", "paused");
 }
 
 fn emit_listening() {
     let _ = fs::write(state_file(), "active");
-    emit_waybar_state("󰓅", "Shazam is listening (ambient)...", "ambient");
+    emit_waybar_state("󰓅", "hark is listening...", "ambient");
 }
 
 fn emit_offline() {
     let _ = fs::write(state_file(), "offline");
-    emit_waybar_state("󰖪", "Shazam: Network unreachable", "offline");
+    emit_waybar_state("󰖪", "hark: network unreachable", "offline");
 }
 
 fn emit_ratelimited() {
     let _ = fs::write(state_file(), "ratelimited");
-    emit_waybar_state("󱎫", "Shazam: Rate-limited by API • Cooling down", "ratelimited");
+    emit_waybar_state("󱎫", "hark: rate-limited by Shazam, backing off", "ratelimited");
 }
 
 fn emit_found(song: &RecognizedSong) {
@@ -319,7 +333,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
             println!("Toggled daemon (PID {})", pid);
         } else {
-            eprintln!("shazam-daemon is not running");
+            eprintln!("hark is not running");
             std::process::exit(1);
         }
         return Ok(());
@@ -334,7 +348,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Check single-instance
     if let Some(existing_pid) = read_pid() {
         if existing_pid != std::process::id() as i32 {
-            eprintln!("Another instance of shazam-daemon is running (PID {})", existing_pid);
+            eprintln!("Another instance of hark is already running (PID {})", existing_pid);
             std::process::exit(1);
         }
     }
@@ -363,7 +377,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let http_client = reqwest::Client::builder().timeout(Duration::from_secs(10)).build()?;
 
     // Register D-Bus MPRIS server
-    let player_service = ShazamPlayer::new(
+    let player_service = HarkPlayer::new(
         is_listening.clone(),
         engine_status.clone(),
         current_song.clone(),
@@ -374,8 +388,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         cover_cache.clone(),
     );
     let dbus_conn = Builder::session()?
-        .name("org.mpris.MediaPlayer2.Shazam")?
-        .serve_at("/org/mpris/MediaPlayer2", ShazamRoot)?
+        .name("org.mpris.MediaPlayer2.hark")?
+        .serve_at("/org/mpris/MediaPlayer2", HarkRoot)?
         .serve_at("/org/mpris/MediaPlayer2", player_service)?
         .build()
         .await?;
@@ -418,7 +432,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut pending_candidate: Option<(RecognizedSong, u8)> = None;
     let mut miss_count = 0;
 
-    println!("Shazam high-performance daemon started (12s Ring Buffer Engine).");
+    println!("hark {} started", env!("CARGO_PKG_VERSION"));
 
     loop {
         if check_is_foreground(&is_foreground) {
@@ -460,7 +474,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     emit_paused();
                 }
 
-                if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                     let _ = iface_ref.get().await.playback_status_changed(iface_ref.signal_emitter()).await;
                     let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                     let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
@@ -504,7 +518,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let _ = fs::remove_file(current_file());
                             emit_listening();
 
-                            if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                            if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                                 let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
                                 let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                                 let _ = iface_ref.get().await.playback_status_changed(iface_ref.signal_emitter()).await;
@@ -587,7 +601,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         *current_song.write().await = Some(song.clone());
                         *engine_status.write().await = "found".to_string();
 
-                        if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                        if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                             let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
                             let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                             let _ = iface_ref.get().await.playback_status_changed(iface_ref.signal_emitter()).await;
@@ -602,7 +616,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             tokio::spawn(async move {
                                 match cache_clone.ensure_cached(&client_clone, &cover_url, &key).await {
                                     Ok(_path) => {
-                                        if let Ok(iface_ref) = dbus_clone.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                                        if let Ok(iface_ref) = dbus_clone.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                                             let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                                         }
                                     }
@@ -626,7 +640,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let _ = fs::remove_file(current_file());
                             emit_listening();
 
-                            if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                            if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                                 let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
                                 let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                                 let _ = iface_ref.get().await.playback_status_changed(iface_ref.signal_emitter()).await;
@@ -643,7 +657,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             };
                             if was_offline {
                                 emit_listening();
-                                if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                                if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                                     let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
                                 }
                             }
@@ -683,7 +697,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 } else {
                                     emit_offline();
                                 }
-                                if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                                if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                                     let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
                                     let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                                 }
@@ -700,7 +714,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 }
                             }
                             emit_listening();
-                            if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, ShazamPlayer>("/org/mpris/MediaPlayer2").await {
+                            if let Ok(iface_ref) = dbus_conn.object_server().interface::<_, HarkPlayer>("/org/mpris/MediaPlayer2").await {
                                 let _ = iface_ref.get().await.engine_status_changed(iface_ref.signal_emitter()).await;
                                 let _ = iface_ref.get().await.metadata_changed(iface_ref.signal_emitter()).await;
                             }

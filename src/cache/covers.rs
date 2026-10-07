@@ -91,7 +91,7 @@ impl CoverCacheManager {
         })
     }
 
-    /// Resolves the default XDG cache directory: ~/.cache/shazam/covers
+    /// Resolves the default XDG cache directory: ~/.cache/hark/covers
     pub fn default_cache_dir() -> PathBuf {
         let base = std::env::var("XDG_CACHE_HOME")
             .map(PathBuf::from)
@@ -99,7 +99,7 @@ impl CoverCacheManager {
                 let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
                 PathBuf::from(home).join(".cache")
             });
-        base.join("shazam").join("covers")
+        base.join("hark").join("covers")
     }
 
     /// Default instance using standard XDG cache directory and 100MB limit
@@ -449,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_cache_and_quota_eviction() {
-        let temp_dir = std::env::temp_dir().join(format!("shazam_cache_test_{}", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
+        let temp_dir = std::env::temp_dir().join(format!("hark_cache_test_{}", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
         let manager = CoverCacheManager::new(temp_dir.clone(), 1000).expect("Failed to create manager");
 
         // Write a mock valid JPEG (size: 400 bytes)
