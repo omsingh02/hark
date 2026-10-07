@@ -1,0 +1,103 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds the binary and publishes a GitHub release.
+# Running the workflow manually builds and uploads the artifact only.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build (x86_64 Linux)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Determine version
+        id: version
+        run: |
+          cargo_version="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "hark") | .version')"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [[ "$version" != "$cargo_version" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match the Cargo.toml version $cargo_version"
+              exit 1
+            fi
+          else
+            version="$cargo_version"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          name="hark-${VERSION}-x86_64-linux"
+          mkdir -p "dist/${name}"
+          install -m 755 target/release/hark "dist/${name}/hark"
+          strip "dist/${name}/hark"
+          cp LICENSE README.md CHANGELOG.md "dist/${name}/"
+          cp -r contrib "dist/${name}/contrib"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          rm -r "dist/${name}"
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hark-${{ steps.version.outputs.version }}-x86_64-linux
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hark-${{ needs.build.outputs.version }}-x86_64-linux
+          path: dist
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --generate-notes \
+            "${flags[@]}"
