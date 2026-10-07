@@ -1,1 +1,5 @@
 /target
+
+# Generated LLM context dumps
+/shazam-daemon-codebase.txt
+/shazam-ui-shell-v2.txt
