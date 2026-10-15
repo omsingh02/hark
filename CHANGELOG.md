@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-16
+
 ### Changed
 
 - Renamed the project from `shazam-daemon` to `hark`. This breaks anything that talks to the daemon:
