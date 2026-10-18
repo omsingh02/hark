@@ -16,6 +16,10 @@ $ playerctl -p hark metadata --format '{{ artist }} - {{ title }}'
 Daft Punk - Digital Love
 ```
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="A Waybar whose hark module shows the song hark has just identified, “Cheap Thrills”, with a desktop notification reading “Recognised, Sia - Cheap Thrills”" width="640">
+</p>
+
 > hark is pre-1.0. Command-line options and the D-Bus interface may still change.
 
 ## Features
