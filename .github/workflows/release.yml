@@ -25,7 +25,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
@@ -68,7 +68,7 @@ jobs:
           rm -r "dist/${name}"
           ls -l dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hark-${{ steps.version.outputs.version }}-x86_64-linux
           path: dist/*
@@ -82,7 +82,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: hark-${{ needs.build.outputs.version }}-x86_64-linux
           path: dist
