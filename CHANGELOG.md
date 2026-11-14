@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Compensate for the 5-second audio capture window in MPRIS `Position` and `hark:offset`.
+
 ## [0.1.0] - 2026-10-16
 
 ### Changed
