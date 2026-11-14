@@ -9,6 +9,8 @@ use crate::cache::CoverCacheManager;
 use crate::history::HistoryStorage;
 use crate::network::models::RecognizedSong;
 
+const MPRIS_OFFSET_SECONDS: f64 = 5.0;
+
 pub struct HarkRoot;
 
 #[interface(name = "org.mpris.MediaPlayer2")]
@@ -140,8 +142,8 @@ impl HarkPlayer {
     async fn position(&self) -> i64 {
         let guard = self.playback_anchor.read().await;
         if let Some((offset_sec, instant)) = *guard {
-            let current_sec = offset_sec + instant.elapsed().as_secs_f64();
-            (current_sec * 1_000_000.0) as i64
+            let current_sec = offset_sec + instant.elapsed().as_secs_f64() + MPRIS_OFFSET_SECONDS;
+            (current_sec.max(0.0) * 1_000_000.0) as i64
         } else {
             0
         }
@@ -220,9 +222,11 @@ impl HarkPlayer {
             }
             let anchor_guard = self.playback_anchor.read().await;
             let current_offset = if let Some((offset_sec, instant)) = *anchor_guard {
-                offset_sec + instant.elapsed().as_secs_f64()
+                (offset_sec + instant.elapsed().as_secs_f64() + MPRIS_OFFSET_SECONDS).max(0.0)
             } else {
-                song.offset_seconds.unwrap_or(0.0)
+                song.offset_seconds
+                    .map(|off| (off + MPRIS_OFFSET_SECONDS).max(0.0))
+                    .unwrap_or(0.0)
             };
             map.insert("hark:offset".into(), Value::from(current_offset));
             if let Some(yt) = &song.youtube_url {
@@ -310,5 +314,117 @@ impl HarkPlayer {
             self.foreground_notify.notify_waiters();
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_player(
+        playback_anchor: Option<(f64, std::time::Instant)>,
+        song: Option<RecognizedSong>,
+    ) -> (HarkPlayer, std::path::PathBuf) {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_dir =
+            std::env::temp_dir().join(format!("hark_mpris_test_{}_{}", std::process::id(), nanos));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let history = Arc::new(HistoryStorage::open(&temp_dir));
+        let cover_cache =
+            Arc::new(CoverCacheManager::new(temp_dir.join("covers"), 1024 * 1024).unwrap());
+
+        let player = HarkPlayer::new(
+            Arc::new(AtomicBool::new(true)),
+            Arc::new(RwLock::new("found".to_string())),
+            Arc::new(RwLock::new(song)),
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(RwLock::new(playback_anchor)),
+            history,
+            cover_cache,
+        );
+        (player, temp_dir)
+    }
+
+    #[tokio::test]
+    async fn test_position_applies_offset() {
+        let anchor = Some((10.0, std::time::Instant::now()));
+        let (player, temp_dir) = test_player(anchor, None);
+        let pos = player.position().await;
+        // 10.0s + 5.0s offset = 15.0s = 15,000,000 us
+        assert!(
+            (15_000_000..16_000_000).contains(&pos),
+            "Position was {}",
+            pos
+        );
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_metadata_applies_offset_with_anchor() {
+        let anchor = Some((10.0, std::time::Instant::now()));
+        let song = RecognizedSong {
+            title: "Test".to_string(),
+            artist: "Artist".to_string(),
+            album: None,
+            genre: None,
+            isrc: None,
+            shazam_key: Some("123".to_string()),
+            cover_art_url: None,
+            cover_art_hq_url: None,
+            offset_seconds: Some(10.0),
+            preview_audio_url: None,
+            youtube_url: None,
+            share_url: None,
+            lyrics: None,
+        };
+        let (player, temp_dir) = test_player(anchor, Some(song));
+        let meta = player.metadata().await;
+        let offset_val: f64 = meta.get("hark:offset").unwrap().try_into().unwrap();
+        assert!(
+            (15.0..16.0).contains(&offset_val),
+            "Offset was {}",
+            offset_val
+        );
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_metadata_applies_offset_without_anchor() {
+        let song = RecognizedSong {
+            title: "Test".to_string(),
+            artist: "Artist".to_string(),
+            album: None,
+            genre: None,
+            isrc: None,
+            shazam_key: Some("123".to_string()),
+            cover_art_url: None,
+            cover_art_hq_url: None,
+            offset_seconds: Some(10.0),
+            preview_audio_url: None,
+            youtube_url: None,
+            share_url: None,
+            lyrics: None,
+        };
+        let (player, temp_dir) = test_player(None, Some(song));
+        let meta = player.metadata().await;
+        let offset_val: f64 = meta.get("hark:offset").unwrap().try_into().unwrap();
+        assert!(
+            (offset_val - 15.0).abs() < 1e-6,
+            "Offset was {}",
+            offset_val
+        );
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_position_none_returns_zero() {
+        let (player, temp_dir) = test_player(None, None);
+        assert_eq!(player.position().await, 0);
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }
